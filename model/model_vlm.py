@@ -36,6 +36,7 @@ class MiniMindVLM(MiniMindLM):
         self.vision_proj = VisionProj(lm_dim=params.dim)
 
     @staticmethod
+    # 111
     def get_vision_model(model_path="/root/llm_learn/model/vision_model/clip-vit-base-patch16"):
         model = CLIPModel.from_pretrained(model_path)
         processor = CLIPProcessor.from_pretrained(model_path)
@@ -45,35 +46,42 @@ class MiniMindVLM(MiniMindLM):
         return model.eval(), processor
 
     @staticmethod
+    # eval时使用 
     # image转为tensor
+    # 输出是(1, C, H, W)，每次输入单张图片；
+    # 输出是(B, C, H, W)，每次输入多张图片；
     def image2tensor(image, processor):
         if image.mode in ['RGBA', 'LA']: image = image.convert('RGB')
         inputs = processor(images=image, return_tensors="pt")['pixel_values']
         return inputs
 
     @staticmethod
-    #  image_tensors.shape (bs, num, c, im_h, im_w)
+    #  image_tensors.shape (bs, c, im_h, im_w)
     #  tensor转为emb
+    # 3333
     def get_image_embeddings(image_tensors, vision_model):
         with torch.no_grad():
             
             outputs = vision_model.vision_model(pixel_values=image_tensors)
             # 是ViT模型最后一层输出的所有token的隐藏表示
 
+        # 一个patch看作是一个token
+        # hidden_size=768
         # outputs.last_hidden_state.shape=(batch_size, num_patches + 1, hidden_size)
+        # 因为第一个位置是特殊的标记（如 CLS 标记）
         img_embedding = outputs.last_hidden_state[:, 1:, :].squeeze()#
 
         # shape=(batch_size, num_patches, hidden_size)
-        # num_patches=16*16=196   hidden_size=768
         return img_embedding
 
     # vision_tensors投影到tokens上
+        # 4444
     def count_vision_proj(self, tokens, h, vision_tensors=None, seqlen=512):
       # 将图片向量嵌入到文本向量序列中
         
         # vision_tensors.size=(bs,num_images,num_patches,hidden_dim)
         # token.size=(bs,seq_len)
-        # image_ids是特殊的@
+        # image_ids [34] * 196,# 34是'@'经过tokenlizer编码解码得到的值
         def find_indices(tokens, image_ids):
           # 寻找图片向量应嵌入位置的下标
             image_ids_tensor = torch.tensor(image_ids).to(tokens.device)
@@ -106,6 +114,8 @@ class MiniMindVLM(MiniMindLM):
 
         image_indices = find_indices(tokens, self.params.image_ids)
         if vision_tensors is not None and image_indices:
+
+            # (bs,num_images,num_patches,dim)
             vision_proj = self.vision_proj(vision_tensors)
             if len(vision_proj.shape) == 3:
                 vision_proj = vision_proj.unsqueeze(0)
@@ -113,21 +123,27 @@ class MiniMindVLM(MiniMindLM):
 
             # h.size(bs,seq_len,dim)
             for i in range(h.size(0)):
+
+                # 遍历字典
                 if i in image_indices:
+
+                    # (seq_len,dim)
                     h_i = h[i]
                     img_idx = 0
                     for start_idx, end_idx in image_indices[i]:
                         if img_idx < vision_proj.size(1):
+
+                            # 拼接后的h_i.shape=(seq_len,hidden_dim)
                             h_i = torch.cat((h_i[:start_idx], vision_proj[i][img_idx], h_i[end_idx + 1:]), dim=0)[
                                   :seqlen]
                             img_idx += 1
                     new_h.append(h_i)
-                    # 拼接后的h_i.shape=(seq_len,hidden_dim)
+                    
                 else:
                     new_h.append(h[i])
             return torch.stack(new_h, dim=0)
         return h
-
+    
     def forward(self,
                 input_ids: Optional[torch.Tensor] = None,
                 past_key_values: Optional[List[Tuple[torch.Tensor, torch.Tensor]]] = None,
@@ -135,12 +151,18 @@ class MiniMindVLM(MiniMindLM):
                 **args):
         start_pos = args.get('start_pos', 0)
         # start_pos = args.get('start_pos', default = 0)
+
+        # pixel_tensors.shape(B, 1, C, H, W)
         pixel_tensors = args.get('pixel_tensors', None)
         h = self.tok_embeddings(input_ids)
 
+        
         if pixel_tensors is not None and start_pos == 0:
+
+            # 为什么会多一个维度？？？？
             if len(pixel_tensors.shape) == 6:
                 pixel_tensors = pixel_tensors.squeeze(2)
+                
             bs, num, c, im_h, im_w = pixel_tensors.shape # num张图片是因为一段文字可以对应不只一张图片
 
             # 在训练时，批次是第一个维度0，而每个样本可能有多个图像嵌入，因此在第二个维度1堆叠可以保持形状为(bs, num, ...)，
@@ -155,7 +177,7 @@ class MiniMindVLM(MiniMindLM):
                 for i in range(num)
             ], dim=stack_dim)
 
-            # vision_tensors 投影到 input_ids的维度
+            # vision_tensors 投影到 h的维度
             h = self.count_vision_proj(tokens=input_ids, h=h, vision_tensors=vision_tensors, seqlen=input_ids.shape[1])
 
         pos_cis = self.pos_cis[start_pos:start_pos + input_ids.shape[1]]

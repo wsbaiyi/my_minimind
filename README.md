@@ -337,6 +337,8 @@ python eval_model.py --model_mode 1 # 默认为0：测试pretrain模型效果，
 
 ![image-20250317133142181](../minimind/images/image-20250317133142181.png)
 
+https://www.bilibili.com/list/watchlater?oid=1201309534&bvid=BV1GF4m1L7Nt&spm_id_from=333.1365.top_right_bar_window_view_later.content.click
+
 ### 数据集下载
 
 将下载的数据集文件放到`./dataset/`目录下（✨为推荐的必须项）
@@ -373,6 +375,34 @@ python eval_model.py --model_mode 1 # 默认为0：测试pretrain模型效果，
 
 #  Model Structure
 
+## MiniMind
+
+MiniMind的整体结构一致，只是在RoPE计算、推理函数和FFN层的代码上做了一些小调整。
+其结构如下图（重绘版）：
+
+![structure](../minimind/images/LLM-structure.png)
+![structure-moe](../minimind/images/LLM-structure-moe.png)
+
+修改模型配置见[./model/LMConfig.py](./model/LMConfig.py)。
+参考模型参数版本见下表：
+
+| Model Name        | params | len_vocab | rope_theta | n_layers | d_model | kv_heads | q_heads | share+route |
+| ----------------- | ------ | --------- | ---------- | -------- | ------- | -------- | ------- | ----------- |
+| MiniMind2-Small   | 26M    | 6400      | 1e6        | 8        | 512     | 2        | 8       | -           |
+| MiniMind2-MoE     | 145M   | 6400      | 1e6        | 8        | 640     | 2        | 8       | 1+4         |
+| MiniMind2         | 104M   | 6400      | 1e6        | 16       | 768     | 2        | 8       | -           |
+| minimind-v1-small | 26M    | 6400      | 1e4        | 8        | 512     | 8        | 16      | -           |
+| minimind-v1-moe   | 4×26M  | 6400      | 1e4        | 8        | 512     | 8        | 16      | 1+4         |
+| minimind-v1       | 108M   | 6400      | 1e4        | 16       | 768     | 8        | 16      | -           |
+
+# 模型参数设定
+
+MiniMind设定small模型dim=512，n_layers=8来获取的「极小体积<->更好效果」的平衡。
+
+# 知识点
+
+## RMSNorm
+
 ![image-20250312163506339](../minimind/images/image-20250312163506339.png)
 
 ## GQA：Grouped Query Attention
@@ -399,7 +429,9 @@ MiniMind-MoE模型，它的结构基于Llama3和[Deepseek-V2/3](https://arxiv.or
 
 ![image-20250312191644634](../minimind/images/image-20250312191644634.png)
 
-### self.scatter_add(dim,index,src)，累加
+### self.scatter_add(dim,index,src)
+
+累加
 
 ![img](../minimind/images/v2-e68a940a7be07f7ab08899e357362d5f_1440w.jpg)
 
@@ -409,29 +441,398 @@ MiniMind-MoE模型，它的结构基于Llama3和[Deepseek-V2/3](https://arxiv.or
 
 ![image-20250313100147640](../minimind/images/image-20250313100147640.png)
 
+## RoPE（Rotary Position Embedding）
+
+R(theta)就是旋转矩阵
+
+![image-20250318110543999](../minimind/images/image-20250318110543999.png)
+
+![image-20250318110603931](../minimind/images/image-20250318110603931.png)
+
+多维
+
+看作是钟表；m和n是token的位置
+
+![image-20250318110639726](../minimind/images/image-20250318110639726.png)
+
+## LoRA（Low-Rank Adaptation of Large Language Models）
+
+反向传播时仅更新Lora权重矩阵
+
+更新后Lora矩阵加到原始权重矩阵上完成更新
+
+![image-20250318103129964](../minimind/images/image-20250318103129964.png)
+
+r远远小于M,N，因此降低了参数量
+
+![image-20250318103544107](../minimind/images/image-20250318103544107.png)
+
+## ViT
+
+https://www.bilibili.com/video/BV15P4y137jb?spm_id_from=333.788.videopod.sections&vd_source=edb614e9f3e817577f46a2e9deeca011
+
+```
+图片：224*224*3
+N:(224*224)/(16*16)=196
+D:16*16*3=768
+```
+
+![image-20250319160756977](../minimind/images/image-20250319160756977.png)
+
+![image-20250319161712499](../minimind/images/image-20250319161712499.png)
+
+![image-20250319161309474](../minimind/images/image-20250319161309474.png)
 
 
-MiniMind的整体结构一致，只是在RoPE计算、推理函数和FFN层的代码上做了一些小调整。
-其结构如下图（重绘版）：
 
-![structure](../minimind/images/LLM-structure.png)
-![structure-moe](../minimind/images/LLM-structure-moe.png)
+## clip
 
-修改模型配置见[./model/LMConfig.py](./model/LMConfig.py)。
-参考模型参数版本见下表：
+zero shot----···+-
 
-| Model Name        | params | len_vocab | rope_theta | n_layers | d_model | kv_heads | q_heads | share+route |
-| ----------------- | ------ | --------- | ---------- | -------- | ------- | -------- | ------- | ----------- |
-| MiniMind2-Small   | 26M    | 6400      | 1e6        | 8        | 512     | 2        | 8       | -           |
-| MiniMind2-MoE     | 145M   | 6400      | 1e6        | 8        | 640     | 2        | 8       | 1+4         |
-| MiniMind2         | 104M   | 6400      | 1e6        | 16       | 768     | 2        | 8       | -           |
-| minimind-v1-small | 26M    | 6400      | 1e4        | 8        | 512     | 8        | 16      | -           |
-| minimind-v1-moe   | 4×26M  | 6400      | 1e4        | 8        | 512     | 8        | 16      | 1+4         |
-| minimind-v1       | 108M   | 6400      | 1e4        | 16       | 768     | 8        | 16      | -           |
+![image-20250319161854468](../minimind/images/image-20250319161854468.png)
 
-# 模型参数设定
+labels代表正样本，因为对角线都是正样本
 
-MiniMind设定small模型dim=512，n_layers=8来获取的「极小体积<->更好效果」的平衡。
+![image-20250319163931781](../minimind/images/image-20250319163931781.png)
+
+## 混合精度scaler
+
+![image-20250319192044309](../minimind/images/image-20250319192044309.png)
+
+loss计算时，梯度一般很小，超过FP16的范围，因此采用scale缩放
+
+![image-20250319192106215](../minimind/images/image-20250319192106215.png)
+
+scaler.update()更新scale比例
+
+![image-20250319191755309](../minimind/images/image-20250319191755309.png)
+
+## 显存占用（混合精度，FP16和FP32）
+
+### 输入输出
+
+![image-20250319182556811](../minimind/images/image-20250319182556811.png)
+
+### 模型参数
+
+![image-20250319182727676](../minimind/images/image-20250319182727676.png)
+
+### 优化器
+
+为什么不用fp16，因为存在大量的小值操作（梯度计算后乘以一个很小的学习率），可能会丢失精度
+
+![image-20250319183417425](../minimind/images/image-20250319183417425.png)
+
+adam优化器
+
+![image-20250319183329645](../minimind/images/image-20250319183329645.png)
+
+### 激活值
+
+https://zhuanlan.zhihu.com/p/673916177
+
+**激活值：需要在前向传播时保存中间值，便于反向传播计算**
+
+![image-20250319184302628](../minimind/images/image-20250319184302628.png)
+
+![image-20250319184416752](../minimind/images/image-20250319184416752.png)
+
+![image-20250319192803737](../minimind/images/image-20250319192803737.png)
+
+![image-20250319185604434](../minimind/images/image-20250319185604434.png)
+
+![image-20250319185858503](../minimind/images/image-20250319185858503.png)
+
+### 梯度值
+
+![image-20250319184506157](../minimind/images/image-20250319184506157.png)
+
+### 总占用
+
+![image-20250319184636424](../minimind/images/image-20250319184636424.png)
+
+## Adam和AdamW
+
+https://www.bilibili.com/video/BV1NZ421s75D/?spm_id_from=333.1387.upload.video_card.click&vd_source=edb614e9f3e817577f46a2e9deeca011
+
+![image-20250319193214757](../minimind/images/image-20250319193214757.png)
+
+![image-20250319193355233](../minimind/images/image-20250319193355233.png)
+
+![image-20250319193931216](../minimind/images/image-20250319193931216.png)
+
+-w，weight decay权重衰减，防止参数过大，提高模型泛化能力
+
+![image-20250319194454645](../minimind/images/image-20250319194454645.png)
+
+**L2正则和权重衰减不同**
+
+![image-20250319194046711](../minimind/images/image-20250319194046711.png)
+
+保存梯度指数平滑值V和保存梯度平方指数平滑值S两个参数，float32存储，因此是原参数的4被
+
+![image-20250319194718141](../minimind/images/image-20250319194718141.png)
+
+## 量化
+
+减小模型大小和显存占用
+
+浮点数转为整数型计算
+
+### 量化和反量化：对称量化和非对称量化
+
+![image-20250319201402966](../minimind/images/image-20250319201402966.png)
+
+![image-20250319201722534](../minimind/images/image-20250319201722534.png)
+
+### 神经网络量化
+
+![image-20250319202219301](../minimind/images/image-20250319202219301.png)
+
+### 动态量化
+
+量化参数：zero_point，scale
+
+输入fp32，输出fp32，每层动态保存int8权重；**每次输出fp32**
+
+![image-20250319204420378](../minimind/images/image-20250319204420378.png)
+
+### 静态量化
+
+每层输出int8，利用代表性数据得到每层的量化参数，以后每层就固定使用这些参数；**有误差**
+
+![image-20250319204400829](../minimind/images/image-20250319204400829.png)
+
+### 量化感知训练
+
+![image-20250319205245822](../minimind/images/image-20250319205245822.png)
+
+### LLM.int8
+
+![image-20250319210306174](../minimind/images/image-20250319210306174.png)
+
+```
+# hugging face 模型量化步骤
+bnb_config=BitsAndBytesConfig(load_in_8bit=True)
+model=AutoModelForCausalLM.from_pretrained(model_id,device_map='auto',quantization_config=bnb_config)
+```
+
+### QLoRA 4bit 量化 NormalFloat4 量化
+
+4bit总共有16类
+
+![image-20250319211516594](../minimind/images/image-20250319211516594.png)
+
+![image-20250319211626597](../minimind/images/image-20250319211626597.png)
+
+查表，和哪个值最接近得到索引
+
+![image-20250319212318899](../minimind/images/image-20250319212318899.png)
+
+分块量化：QLoRA每64个值作为一个块进行NF4 4-bit量化
+
+![image-20250319213148921](../minimind/images/image-20250319213148921.png)
+
+**NF4量化后不能直接计算，只能反量化为浮点型进行计算**
+
+![image-20250319211429968](../minimind/images/image-20250319211429968.png)
+
+## 大模型分布式DP
+
+### DP:data parallel
+
+单进程，多线程，只能利用一个cpu
+
+GPU0通信量大
+
+![image-20250319220151303](../minimind/images/image-20250319220151303.png)
+
+### DDP:distributed data parallel
+
+ring_allreduce: scatter-reduce（有一个数据满了就结束这一阶段）  +  allgather
+
+![image-20250319221019146](../minimind/images/image-20250319221019146.png)
+
+![image-20250319221051513](../minimind/images/image-20250319221051513.png)
+
+
+
+![image-20250319220654786](../minimind/images/image-20250319220654786.png)
+
+![image-20250319221259577](../minimind/images/image-20250319221259577.png)
+
+### DeepSpeed ZeRO-1 (zero redundancy optimizer 零冗余优化器)
+
+反向传播参数：1
+
+梯度收集：1
+
+
+
+**广播梯度-->更新参数**
+
+大大减少了显存：仅发送给单一GPU
+
+每个GPU保存对应一层的优化器Adam（FP32数据）；每一GPU得到自己层的参数后广播至其他GPU
+
+**为什么需要保存FP16和FP32梯度？？？**
+
+```
+在混合精度训练中，保存FP16梯度和优化器中维护FP32梯度主要是由于以下原因：
+
+1. 反向传播的依赖性与全局梯度处理
+链式法则的连续性：虽然每一层的梯度计算在理论上可以独立完成，但实际中梯度可能需要进行全局操作（如梯度裁剪、归一化）。例如，梯度裁剪需要计算所有参数的梯度范数，才能确定缩放比例。这要求所有梯度必须保留至反向传播完成，无法逐层释放。
+分布式训练中的梯度聚合：在数据并行中，梯度需要跨设备或批次进行累积和同步。梯度必须保留至聚合完成，才能更新权重。
+2. 优化器状态更新的需求
+优化器内部状态依赖完整梯度：如Adam优化器需要维护动量和方差等状态，这些状态的计算需要基于完整的梯度信息。若逐层更新，可能导致状态计算错误（例如动量的指数滑动平均需要所有梯度同时参与）。
+FP32精度的重要性：优化器使用FP32存储梯度以确保数值稳定性。例如，学习率较小时，FP16可能无法表示梯度更新量（如 lr * grad 可能下溢为0），而FP32可避免这一问题。
+3. 框架实现的机制
+计算图与梯度保留策略：主流框架（如PyTorch）的动态计算图默认保留梯度直至反向传播结束。手动释放需要复杂的内存管理（如detach()或retain_graph），但可能破坏计算图的完整性。
+梯度累积的常见实践：在显存不足时，用户可能通过多批次累积梯度再更新。此时梯度需跨批次保留，无法立即释放。
+4. 混合精度中的梯度转换
+梯度缩放（Gradient Scaling）：为防止FP16梯度下溢，混合精度训练通常对梯度进行放大（Scale），再将缩放的FP16梯度转换为FP32用于更新。此过程需要在全局范围内统一处理，无法逐层操作。
+```
+
+![image-20250319222321451](../minimind/images/image-20250319222321451.png)
+
+![image-20250319222303536](../minimind/images/image-20250319222303536.png)
+
+### DeepSpeed ZeRO-2
+
+反向传播参数：1
+
+梯度收集：1
+
+![image-20250319224601012](../minimind/images/image-20250319224601012.png)
+
+### DeepSpeed ZeRO-3
+
+由于每个GPU独占一层parameter，因此前向传播和反向传播时需要对应GPU广播对应参数：2次
+
+梯度收集：1
+
+![image-20250319224314692](../minimind/images/image-20250319224314692.png)
+
+### 显存节省分析
+
+os：zero1
+
+os+g：zero2   共享gradient
+
+os+g+p：zero3   共享gradient，parameter
+
+![image-20250319224347437](../minimind/images/image-20250319224347437.png)
+
+## 梯度检查点gradient checkpoint/激活值检查点activation checkpoint  
+
+节省显存
+
+反向传播时神经网络默认保存所有梯度，gradient checkpoint可以选择性保存一些梯度来节省显存，未保存的梯度可以计算得到
+
+![image-20250319231033758](../minimind/images/image-20250319231033758.png)
+
+![image-20250319231006486](../minimind/images/image-20250319231006486.png)
+
+## KV cache
+
+https://www.bilibili.com/video/BV1kx4y1x7bu/?spm_id_from=333.1387.upload.video_card.click&vd_source=edb614e9f3e817577f46a2e9deeca011
+
+由于自注意力机制，每一token只能看到自己之前的token；对新的token非常，用Q查询前面所有的K得到权重，再乘以V得到注意力分数；因此使用KV cache保存以前token的kv，节省计算
+
+![image-20250320105437842](../minimind/images/image-20250320105437842.png)
+
+## VLLM（**Very Large Language Model Inference Framework**）
+
+**高效大语言模型推理框架**
+
+解决KV cache浪费显存的问题
+
+### PagedAttention：键值缓存的分页管理**
+
+类似操作系统
+
+![image-20250320110026574](../minimind/images/image-20250320110026574.png)
+
+![image-20250320110128888](../minimind/images/image-20250320110128888.png)
+
+- **问题背景**：传统注意力机制在处理长序列时，键值（KV）缓存需预分配连续显存，导致显存碎片化，限制并发请求数和吞吐量。
+- 解决方案
+  - **分页机制**：将 KV 缓存划分为固定大小的“块”（类似操作系统内存分页），按需动态分配物理块，消除显存碎片。
+  - **逻辑块映射表**：记录序列中每个 token 对应的物理块地址，支持非连续显存的高效访问。
+- **效果**：显存利用率提升 **4-5 倍**，支持更长上下文（如 16K tokens）和更高并发请求。
+
+### sharing kv cache
+
+vLLM的SamplingParameter里有个参数n， n: Number of output sequences to return for the given prompt. 业务场景：我在生成训练数据时经常用，比如Prompt是针对给定文本，提出一个问题。n设置为2。vLLM会给你返回两个output。
+
+例如下面给出翻译的两种输出
+
+![image-20250320110742116](../minimind/images/image-20250320110742116.png)
+
+### **连续批处理（Continuous Batching）**
+
+- **动态请求调度**：将多个用户请求的 tokens 打包为统一批次，实时动态调整批次大小，避免传统静态批处理的等待延迟。
+- **优势**：GPU 利用率提升 **5-10 倍**，尤其适合流式输出场景。
+
+![image-20250319232758455](../minimind/images/image-20250319232758455.png)
+
+## Flash Attention
+
+HBM 是 **High Bandwidth Memory** 的缩写，中文称为**高带宽内存**。它是一种用于高性能计算和图形处理的高性能内存技术，主要用于 GPU（图形处理器）、AI 加速器和数据中心等领域。HBM 通过将内存芯片堆叠在一起，并与处理器通过高密度互连技术直接连接，显著提高了内存带宽和能效。
+
+![image-20250320150459317](../minimind/images/image-20250320150459317.png)
+
+![image-20250320150630354](../minimind/images/image-20250320150630354.png)
+
+1. **分块（Tiling）**
+   将输入序列分为多个小块（例如每块 64-128 个 token），每次仅处理一小块，避免一次性加载整个 QKᵀ 矩阵。
+2. **在线 Softmax 修正**
+   在分块计算 Softmax 时，动态调整每块的统计量（如最大值和求和项），确保全局结果的数值稳定性。
+3. **重计算（Recomputation）**
+   反向传播时，通过存储少量元数据（如随机数种子）重新生成中间结果，避免显存占用。
+
+![image-20250320152939108](../minimind/images/image-20250320152939108.png)
+
+
+
+![image-20250320152958609](../minimind/images/image-20250320152958609.png)
+
+![image-20250320163729777](../minimind/images/image-20250320163729777.png)
+
+ ![image-20250320163644708](../minimind/images/image-20250320163644708.png)
+
+![image-20250320153020336](../minimind/images/image-20250320153020336.png)
+
+```
+算法流程：
+Qi  Br,d
+Ki,Vi  Bc,d
+
+m_ij：存储第i行第j列的小块每一行的最大值
+P_ij：存储第i行第j列的小块每一行的exp
+l_ij：存储第i行第j列的小块每一行的exp总和
+O_i：存储第i行的Output
+m_i_new：存储第i行0到j列每一行的最大值
+l_i_new：存储第i行0到j列每一行的总和（-m_i_new因为指数函数结果很大，为了缩小数据）
+
+第十二行代码：第二个括号的第一部分计算的是以前的O的总和，第二部分计算的的当前新算出来的O，乘以外面的逆矩阵相当于除以sum
+```
+
+## PPO
+
+
+
+## DPO
+
+![image-20250317133142181](../minimind/images/image-20250317133142181.png)
+
+https://www.bilibili.com/list/watchlater?oid=1201309534&bvid=BV1GF4m1L7Nt&spm_id_from=333.1365.top_right_bar_window_view_later.content.click
+
+
+
+
+
+
 
 # 项目文件说明
 

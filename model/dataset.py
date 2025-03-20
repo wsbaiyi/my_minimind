@@ -103,11 +103,16 @@ class VLMDataset(Dataset):
         image_tensors = []
         for image_name in image_paths.split(','):
             image_name = image_name.strip()
+
+            # image对象
             image = Image.open(f'{self.images_path}/{image_name}')
+
+            # 
             image_tensor = MiniMindVLM.image2tensor(image, self.preprocess)
             image_tensors.append(image_tensor)
         image_tensors = torch.stack(image_tensors, dim=0)
 
+        # image_tensors.shape (B, 1, C, H, W)
         return X, Y, loss_mask, image_tensors
 
 
