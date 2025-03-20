@@ -22,7 +22,7 @@ show_channel_urls: True
 
 # **项目包含**
 
-- MiniMind-LLM结构的全部代码（Dense+MoE模型）。
+- my_minimind-LLM结构的全部代码（Dense+MoE模型）。
 - 包含Tokenizer分词器详细训练代码。
 - 包含Pretrain、SFT、LoRA、RLHF-DPO、模型蒸馏的全过程训练代码。
 - 收集、蒸馏、整理并清洗去重所有阶段的高质量数据集，且全部开源。
@@ -32,7 +32,7 @@ show_channel_urls: True
 - 在第三方测评榜（C-Eval、C-MMLU、OpenBookQA等）进行模型测试。
 - 实现Openai-Api协议的极简服务端，便于集成到第三方ChatUI使用（FastGPT、Open-WebUI等）。
 - 基于streamlit实现最简聊天WebUI前端。
-- 复现(蒸馏/RL)大型推理模型DeepSeek-R1的MiniMind-Reason模型，**数据+模型**全部开源
+- 复现(蒸馏/RL)大型推理模型DeepSeek-R1的my_minimind-Reason模型，**数据+模型**全部开源
 
 # 📌 快速开始
 
@@ -52,7 +52,7 @@ show_channel_urls: True
 </details>
 
 ```bash
-git clone https://github.com/jingyaogong/minimind.git
+git clone https://github.com/jingyaogong/my_minimind.git
 ```
 
 ## Ⅰ 测试已有模型效果
@@ -66,8 +66,8 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 ### 2.下载模型
 
 ```bash
-# MiniMind2放在minimind的根目录
-git clone https://huggingface.co/jingyaogong/MiniMind2
+# my_minimind2放在my_minimind的根目录
+git clone https://huggingface.co/jingyaogong/my_minimind2
 ```
 
 ### 3.启动WebUI
@@ -96,7 +96,7 @@ streamlit run web_demo.py
 SFT阶段就需要把半成品LLM施加一个自定义的聊天模板进行微调。
 例如模型遇到这样的模板【问题->回答，问题->回答】后不再无脑接龙，而是意识到这是一段完整的对话结束。
 称这个过程为指令微调，就如同让已经学富五车的「牛顿」先生适应21世纪智能手机的聊天习惯，学习屏幕左侧是对方消息，右侧是本人消息这个规律。
-在训练时，MiniMind的指令和回答长度被截断在512，是为了节省显存空间。就像我们学习时，会先从短的文章开始，当学会写作200字作文后，800字文章也可以手到擒来。
+在训练时，my_minimind的指令和回答长度被截断在512，是为了节省显存空间。就像我们学习时，会先从短的文章开始，当学会写作200字作文后，800字文章也可以手到擒来。
 
 > ```bash
 > python train_full_sft.py
@@ -137,7 +137,7 @@ python train_dpo.py
 full_sft模型在简洁性和信息准确性方面表现更好；rlhf模型在回答中倾向于提供更多的背景信息，但信息准确性有待改进。
 总的来说RLHF后的模型倾向于学习：说更多有礼貌但无用的废话讨好“对话”本身，而对信息准确性则有轻微损失。
 天下没有免费的午餐，还需要继续提升RLHF数据集的质量，也要接受模型能力无法避免的损失(程度有轻重)。
-DPO和在线PPO的区别在于reject和chosen都是离线准备的，和minimind模型本身的输出必然存在很大的分布差异。
+DPO和在线PPO的区别在于reject和chosen都是离线准备的，和my_minimind模型本身的输出必然存在很大的分布差异。
 通俗地说DPO算法使模型观看乒乓球世界冠军的打法「录像」进行RL，而不是像PPO一样请reward模型做「教练」纠正自己的打法进行RL
 
 ### 知识蒸馏(Knowledge Distillation, KD)
@@ -167,7 +167,7 @@ python train_full_sft.py
 
 > 训练后的模型权重文件默认每隔`100步`同样保存为: `full_sft_*.pth`（*为模型具体dimension，每次保存时新文件会覆盖旧文件）
 
-此处应当着重介绍MiniMind实现的白盒蒸馏代码`train_distillation.py`，由于MiniMind同系列本身并不存在强大的教师模型，因此白盒蒸馏代码仅作为学习参考。
+此处应当着重介绍my_minimind实现的白盒蒸馏代码`train_distillation.py`，由于my_minimind同系列本身并不存在强大的教师模型，因此白盒蒸馏代码仅作为学习参考。
 
 ```bash
 torchrun --nproc_per_node 1 train_distillation.py
@@ -208,7 +208,7 @@ DeepSeek-R1实在太火了，几乎重新指明了未来LLM的新范式。
 但由于缺乏技术含量，蒸馏派被RL派瞧不起（hhhh）。
 本人迅速已经在Qwen系列1.5B小模型上进行了尝试，很快复现了Zero过程的数学推理能力。
 然而一个遗憾的共识是：参数太小的模型直接通过冷启动SFT+GRPO几乎不可能获得任何推理效果。
-MiniMind2第一时间只能坚定不移的选择做蒸馏派，日后基于0.1B模型的RL如果同样取得小小进展会更新此部分的训练方案。
+my_minimind2第一时间只能坚定不移的选择做蒸馏派，日后基于0.1B模型的RL如果同样取得小小进展会更新此部分的训练方案。
 
 做蒸馏需要准备的依然是和SFT阶段同样格式的数据即可，数据集来源已如上文介绍。数据格式例如：
 
@@ -221,7 +221,7 @@ MiniMind2第一时间只能坚定不移的选择做蒸馏派，日后基于0.1B�
     },
     {
       "role": "assistant",
-      "content": "<think>\n你好！我是由中国的个人开发者独立开发的智能助手MiniMind-R1-Lite-Preview，很高兴为您提供服务！\n</think>\n<answer>\n你好！我是由中国的个人开发者独立开发的智能助手MiniMind-R1-Lite-Preview，很高兴为您提供服务！\n</answer>"
+      "content": "<think>\n你好！我是由中国的个人开发者独立开发的智能助手my_minimind-R1-Lite-Preview，很高兴为您提供服务！\n</think>\n<answer>\n你好！我是由中国的个人开发者独立开发的智能助手my_minimind-R1-Lite-Preview，很高兴为您提供服务！\n</answer>"
     }
   ]
 }
@@ -263,7 +263,7 @@ python train_distill_reason.py
 ## 测试模型效果
 
 确保需要测试的模型`*.pth`文件位于`./out/`目录下。
-也可以直接去[此处](https://www.modelscope.cn/models/gongjy/MiniMind2-PyTorch/files)下载使用我训练的`*.pth`文件。
+也可以直接去[此处](https://www.modelscope.cn/models/gongjy/my_minimind2-PyTorch/files)下载使用我训练的`*.pth`文件。
 
 ```bash
 python eval_model.py --model_mode 1 # 默认为0：测试pretrain模型效果，设置为1：测试full_sft模型效果
@@ -282,9 +282,9 @@ python eval_model.py --model_mode 1 # 默认为0：测试pretrain模型效果，
 
 ```
 # 一些自言自语
-> 尽管minimind_tokenizer长度很小，编解码效率弱于qwen2、glm等中文友好型分词器。
-> 但minimind模型选择了自己训练的minimind_tokenizer作为分词器，以保持整体参数轻量，避免编码层和计算层占比失衡，头重脚轻，因为minimind的词表大小只有6400。
-> 且minimind在实际测试中没有出现过生僻词汇解码失败的情况，效果良好。
+> 尽管my_minimind_tokenizer长度很小，编解码效率弱于qwen2、glm等中文友好型分词器。
+> 但my_minimind模型选择了自己训练的my_minimind_tokenizer作为分词器，以保持整体参数轻量，避免编码层和计算层占比失衡，头重脚轻，因为my_minimind的词表大小只有6400。
+> 且my_minimind在实际测试中没有出现过生僻词汇解码失败的情况，效果良好。
 > 由于自定义词表压缩长度到6400，使得LLM总参数量最低只有25.8M。
 > 训练数据`tokenizer_train.jsonl`均来自于`匠数大模型数据集`，这部分数据相对次要，如需训练可以自由选择。
 ```
@@ -335,7 +335,7 @@ python eval_model.py --model_mode 1 # 默认为0：测试pretrain模型效果，
 }
 ```
 
-![image-20250317133142181](../minimind/images/image-20250317133142181.png)
+![image-20250317133142181](../my_minimind/images/image-20250317133142181.png)
 
 https://www.bilibili.com/list/watchlater?oid=1201309534&bvid=BV1GF4m1L7Nt&spm_id_from=333.1365.top_right_bar_window_view_later.content.click
 
@@ -363,7 +363,7 @@ https://www.bilibili.com/list/watchlater?oid=1201309534&bvid=BV1GF4m1L7Nt&spm_id
 
 
 * `dpo.jsonl` --RLHF阶段数据集
-* `lora_identity.jsonl` --自我认知数据集（例如：你是谁？我是minimind...），推荐用于lora训练（亦可用于全参SFT，勿被名字局限）
+* `lora_identity.jsonl` --自我认知数据集（例如：你是谁？我是my_minimind...），推荐用于lora训练（亦可用于全参SFT，勿被名字局限）
 * `lora_medical.jsonl` --医疗问答数据集，推荐用于lora训练（亦可用于全参SFT，勿被名字局限）
 * `pretrain_hq.jsonl`✨ --预训练数据集，整合自jiangshu科技
 * `r1_mix_1024.jsonl` --DeepSeek-R1-1.5B蒸馏数据，每条数据字符最大长度为1024（因此训练时设置max_seq_len=1024）
@@ -375,35 +375,35 @@ https://www.bilibili.com/list/watchlater?oid=1201309534&bvid=BV1GF4m1L7Nt&spm_id
 
 #  Model Structure
 
-## MiniMind
+## my_minimind
 
-MiniMind的整体结构一致，只是在RoPE计算、推理函数和FFN层的代码上做了一些小调整。
+my_minimind的整体结构一致，只是在RoPE计算、推理函数和FFN层的代码上做了一些小调整。
 其结构如下图（重绘版）：
 
-![structure](../minimind/images/LLM-structure.png)
-![structure-moe](../minimind/images/LLM-structure-moe.png)
+![structure](../my_minimind/images/LLM-structure.png)
+![structure-moe](../my_minimind/images/LLM-structure-moe.png)
 
 修改模型配置见[./model/LMConfig.py](./model/LMConfig.py)。
 参考模型参数版本见下表：
 
-| Model Name        | params | len_vocab | rope_theta | n_layers | d_model | kv_heads | q_heads | share+route |
-| ----------------- | ------ | --------- | ---------- | -------- | ------- | -------- | ------- | ----------- |
-| MiniMind2-Small   | 26M    | 6400      | 1e6        | 8        | 512     | 2        | 8       | -           |
-| MiniMind2-MoE     | 145M   | 6400      | 1e6        | 8        | 640     | 2        | 8       | 1+4         |
-| MiniMind2         | 104M   | 6400      | 1e6        | 16       | 768     | 2        | 8       | -           |
-| minimind-v1-small | 26M    | 6400      | 1e4        | 8        | 512     | 8        | 16      | -           |
-| minimind-v1-moe   | 4×26M  | 6400      | 1e4        | 8        | 512     | 8        | 16      | 1+4         |
-| minimind-v1       | 108M   | 6400      | 1e4        | 16       | 768     | 8        | 16      | -           |
+| Model Name           | params | len_vocab | rope_theta | n_layers | d_model | kv_heads | q_heads | share+route |
+| -------------------- | ------ | --------- | ---------- | -------- | ------- | -------- | ------- | ----------- |
+| my_minimind2-Small   | 26M    | 6400      | 1e6        | 8        | 512     | 2        | 8       | -           |
+| my_minimind2-MoE     | 145M   | 6400      | 1e6        | 8        | 640     | 2        | 8       | 1+4         |
+| my_minimind2         | 104M   | 6400      | 1e6        | 16       | 768     | 2        | 8       | -           |
+| my_minimind-v1-small | 26M    | 6400      | 1e4        | 8        | 512     | 8        | 16      | -           |
+| my_minimind-v1-moe   | 4×26M  | 6400      | 1e4        | 8        | 512     | 8        | 16      | 1+4         |
+| my_minimind-v1       | 108M   | 6400      | 1e4        | 16       | 768     | 8        | 16      | -           |
 
 # 模型参数设定
 
-MiniMind设定small模型dim=512，n_layers=8来获取的「极小体积<->更好效果」的平衡。
+my_minimind设定small模型dim=512，n_layers=8来获取的「极小体积<->更好效果」的平衡。
 
 # 知识点
 
 ## RMSNorm
 
-![image-20250312163506339](../minimind/images/image-20250312163506339.png)
+![image-20250312163506339](../my_minimind/images/image-20250312163506339.png)
 
 ## GQA：Grouped Query Attention
 
@@ -411,7 +411,7 @@ MiniMind设定small模型dim=512，n_layers=8来获取的「极小体积<->更�
 
 
 
-MiniMind-Dense（和[Llama3.1](https://ai.meta.com/blog/meta-llama-3-1/)一样）使用了Transformer的Decoder-Only结构，跟GPT-3的区别在于：
+my_minimind-Dense（和[Llama3.1](https://ai.meta.com/blog/meta-llama-3-1/)一样）使用了Transformer的Decoder-Only结构，跟GPT-3的区别在于：
 
 * 采用了GPT-3的预标准化方法，也就是在每个Transformer子层的输入上进行归一化，而不是在输出上。具体来说，使用的是RMSNorm归一化函数。
 * 用SwiGLU激活函数替代了ReLU，这样做是为了提高性能。
@@ -419,7 +419,7 @@ MiniMind-Dense（和[Llama3.1](https://ai.meta.com/blog/meta-llama-3-1/)一样�
 
 ---
 
-MiniMind-MoE模型，它的结构基于Llama3和[Deepseek-V2/3](https://arxiv.org/pdf/2405.04434)中的MixFFN混合专家模块。
+my_minimind-MoE模型，它的结构基于Llama3和[Deepseek-V2/3](https://arxiv.org/pdf/2405.04434)中的MixFFN混合专家模块。
 
 * DeepSeek-V2在前馈网络（FFN）方面，采用了更细粒度的专家分割和共享的专家隔离技术，以提高Experts的效果。
 
@@ -427,33 +427,33 @@ MiniMind-MoE模型，它的结构基于Llama3和[Deepseek-V2/3](https://arxiv.or
 
 ## Moe负载均衡
 
-![image-20250312191644634](../minimind/images/image-20250312191644634.png)
+![image-20250312191644634](../my_minimind/images/image-20250312191644634.png)
 
 ### self.scatter_add(dim,index,src)
 
 累加
 
-![img](../minimind/images/v2-e68a940a7be07f7ab08899e357362d5f_1440w.jpg)
+![img](../my_minimind/images/v2-e68a940a7be07f7ab08899e357362d5f_1440w.jpg)
 
-![img](../minimind/images/v2-e29b96c849bbfaa1fc55ded7f2913442_1440w.jpg)
+![img](../my_minimind/images/v2-e29b96c849bbfaa1fc55ded7f2913442_1440w.jpg)
 
 
 
-![image-20250313100147640](../minimind/images/image-20250313100147640.png)
+![image-20250313100147640](../my_minimind/images/image-20250313100147640.png)
 
 ## RoPE（Rotary Position Embedding）
 
 R(theta)就是旋转矩阵
 
-![image-20250318110543999](../minimind/images/image-20250318110543999.png)
+![image-20250318110543999](../my_minimind/images/image-20250318110543999.png)
 
-![image-20250318110603931](../minimind/images/image-20250318110603931.png)
+![image-20250318110603931](../my_minimind/images/image-20250318110603931.png)
 
 多维
 
 看作是钟表；m和n是token的位置
 
-![image-20250318110639726](../minimind/images/image-20250318110639726.png)
+![image-20250318110639726](../my_minimind/images/image-20250318110639726.png)
 
 ## LoRA（Low-Rank Adaptation of Large Language Models）
 
@@ -461,11 +461,11 @@ R(theta)就是旋转矩阵
 
 更新后Lora矩阵加到原始权重矩阵上完成更新
 
-![image-20250318103129964](../minimind/images/image-20250318103129964.png)
+![image-20250318103129964](../my_minimind/images/image-20250318103129964.png)
 
 r远远小于M,N，因此降低了参数量
 
-![image-20250318103544107](../minimind/images/image-20250318103544107.png)
+![image-20250318103544107](../my_minimind/images/image-20250318103544107.png)
 
 ## ViT
 
@@ -477,11 +477,11 @@ N:(224*224)/(16*16)=196
 D:16*16*3=768
 ```
 
-![image-20250319160756977](../minimind/images/image-20250319160756977.png)
+![image-20250319160756977](../my_minimind/images/image-20250319160756977.png)
 
-![image-20250319161712499](../minimind/images/image-20250319161712499.png)
+![image-20250319161712499](../my_minimind/images/image-20250319161712499.png)
 
-![image-20250319161309474](../minimind/images/image-20250319161309474.png)
+![image-20250319161309474](../my_minimind/images/image-20250319161309474.png)
 
 
 
@@ -489,43 +489,43 @@ D:16*16*3=768
 
 zero shot----···+-
 
-![image-20250319161854468](../minimind/images/image-20250319161854468.png)
+![image-20250319161854468](../my_minimind/images/image-20250319161854468.png)
 
 labels代表正样本，因为对角线都是正样本
 
-![image-20250319163931781](../minimind/images/image-20250319163931781.png)
+![image-20250319163931781](../my_minimind/images/image-20250319163931781.png)
 
 ## 混合精度scaler
 
-![image-20250319192044309](../minimind/images/image-20250319192044309.png)
+![image-20250319192044309](../my_minimind/images/image-20250319192044309.png)
 
 loss计算时，梯度一般很小，超过FP16的范围，因此采用scale缩放
 
-![image-20250319192106215](../minimind/images/image-20250319192106215.png)
+![image-20250319192106215](../my_minimind/images/image-20250319192106215.png)
 
 scaler.update()更新scale比例
 
-![image-20250319191755309](../minimind/images/image-20250319191755309.png)
+![image-20250319191755309](../my_minimind/images/image-20250319191755309.png)
 
 ## 显存占用（混合精度，FP16和FP32）
 
 ### 输入输出
 
-![image-20250319182556811](../minimind/images/image-20250319182556811.png)
+![image-20250319182556811](../my_minimind/images/image-20250319182556811.png)
 
 ### 模型参数
 
-![image-20250319182727676](../minimind/images/image-20250319182727676.png)
+![image-20250319182727676](../my_minimind/images/image-20250319182727676.png)
 
 ### 优化器
 
 为什么不用fp16，因为存在大量的小值操作（梯度计算后乘以一个很小的学习率），可能会丢失精度
 
-![image-20250319183417425](../minimind/images/image-20250319183417425.png)
+![image-20250319183417425](../my_minimind/images/image-20250319183417425.png)
 
 adam优化器
 
-![image-20250319183329645](../minimind/images/image-20250319183329645.png)
+![image-20250319183329645](../my_minimind/images/image-20250319183329645.png)
 
 ### 激活值
 
@@ -533,45 +533,45 @@ https://zhuanlan.zhihu.com/p/673916177
 
 **激活值：需要在前向传播时保存中间值，便于反向传播计算**
 
-![image-20250319184302628](../minimind/images/image-20250319184302628.png)
+![image-20250319184302628](../my_minimind/images/image-20250319184302628.png)
 
-![image-20250319184416752](../minimind/images/image-20250319184416752.png)
+![image-20250319184416752](../my_minimind/images/image-20250319184416752.png)
 
-![image-20250319192803737](../minimind/images/image-20250319192803737.png)
+![image-20250319192803737](../my_minimind/images/image-20250319192803737.png)
 
-![image-20250319185604434](../minimind/images/image-20250319185604434.png)
+![image-20250319185604434](../my_minimind/images/image-20250319185604434.png)
 
-![image-20250319185858503](../minimind/images/image-20250319185858503.png)
+![image-20250319185858503](../my_minimind/images/image-20250319185858503.png)
 
 ### 梯度值
 
-![image-20250319184506157](../minimind/images/image-20250319184506157.png)
+![image-20250319184506157](../my_minimind/images/image-20250319184506157.png)
 
 ### 总占用
 
-![image-20250319184636424](../minimind/images/image-20250319184636424.png)
+![image-20250319184636424](../my_minimind/images/image-20250319184636424.png)
 
 ## Adam和AdamW
 
 https://www.bilibili.com/video/BV1NZ421s75D/?spm_id_from=333.1387.upload.video_card.click&vd_source=edb614e9f3e817577f46a2e9deeca011
 
-![image-20250319193214757](../minimind/images/image-20250319193214757.png)
+![image-20250319193214757](../my_minimind/images/image-20250319193214757.png)
 
-![image-20250319193355233](../minimind/images/image-20250319193355233.png)
+![image-20250319193355233](../my_minimind/images/image-20250319193355233.png)
 
-![image-20250319193931216](../minimind/images/image-20250319193931216.png)
+![image-20250319193931216](../my_minimind/images/image-20250319193931216.png)
 
 -w，weight decay权重衰减，防止参数过大，提高模型泛化能力
 
-![image-20250319194454645](../minimind/images/image-20250319194454645.png)
+![image-20250319194454645](../my_minimind/images/image-20250319194454645.png)
 
 **L2正则和权重衰减不同**
 
-![image-20250319194046711](../minimind/images/image-20250319194046711.png)
+![image-20250319194046711](../my_minimind/images/image-20250319194046711.png)
 
 保存梯度指数平滑值V和保存梯度平方指数平滑值S两个参数，float32存储，因此是原参数的4被
 
-![image-20250319194718141](../minimind/images/image-20250319194718141.png)
+![image-20250319194718141](../my_minimind/images/image-20250319194718141.png)
 
 ## 量化
 
@@ -581,13 +581,13 @@ https://www.bilibili.com/video/BV1NZ421s75D/?spm_id_from=333.1387.upload.video_c
 
 ### 量化和反量化：对称量化和非对称量化
 
-![image-20250319201402966](../minimind/images/image-20250319201402966.png)
+![image-20250319201402966](../my_minimind/images/image-20250319201402966.png)
 
-![image-20250319201722534](../minimind/images/image-20250319201722534.png)
+![image-20250319201722534](../my_minimind/images/image-20250319201722534.png)
 
 ### 神经网络量化
 
-![image-20250319202219301](../minimind/images/image-20250319202219301.png)
+![image-20250319202219301](../my_minimind/images/image-20250319202219301.png)
 
 ### 动态量化
 
@@ -595,21 +595,21 @@ https://www.bilibili.com/video/BV1NZ421s75D/?spm_id_from=333.1387.upload.video_c
 
 输入fp32，输出fp32，每层动态保存int8权重；**每次输出fp32**
 
-![image-20250319204420378](../minimind/images/image-20250319204420378.png)
+![image-20250319204420378](../my_minimind/images/image-20250319204420378.png)
 
 ### 静态量化
 
 每层输出int8，利用代表性数据得到每层的量化参数，以后每层就固定使用这些参数；**有误差**
 
-![image-20250319204400829](../minimind/images/image-20250319204400829.png)
+![image-20250319204400829](../my_minimind/images/image-20250319204400829.png)
 
 ### 量化感知训练
 
-![image-20250319205245822](../minimind/images/image-20250319205245822.png)
+![image-20250319205245822](../my_minimind/images/image-20250319205245822.png)
 
 ### LLM.int8
 
-![image-20250319210306174](../minimind/images/image-20250319210306174.png)
+![image-20250319210306174](../my_minimind/images/image-20250319210306174.png)
 
 ```
 # hugging face 模型量化步骤
@@ -621,21 +621,21 @@ model=AutoModelForCausalLM.from_pretrained(model_id,device_map='auto',quantizati
 
 4bit总共有16类
 
-![image-20250319211516594](../minimind/images/image-20250319211516594.png)
+![image-20250319211516594](../my_minimind/images/image-20250319211516594.png)
 
-![image-20250319211626597](../minimind/images/image-20250319211626597.png)
+![image-20250319211626597](../my_minimind/images/image-20250319211626597.png)
 
 查表，和哪个值最接近得到索引
 
-![image-20250319212318899](../minimind/images/image-20250319212318899.png)
+![image-20250319212318899](../my_minimind/images/image-20250319212318899.png)
 
 分块量化：QLoRA每64个值作为一个块进行NF4 4-bit量化
 
-![image-20250319213148921](../minimind/images/image-20250319213148921.png)
+![image-20250319213148921](../my_minimind/images/image-20250319213148921.png)
 
 **NF4量化后不能直接计算，只能反量化为浮点型进行计算**
 
-![image-20250319211429968](../minimind/images/image-20250319211429968.png)
+![image-20250319211429968](../my_minimind/images/image-20250319211429968.png)
 
 ## 大模型分布式DP
 
@@ -645,21 +645,21 @@ model=AutoModelForCausalLM.from_pretrained(model_id,device_map='auto',quantizati
 
 GPU0通信量大
 
-![image-20250319220151303](../minimind/images/image-20250319220151303.png)
+![image-20250319220151303](../my_minimind/images/image-20250319220151303.png)
 
 ### DDP:distributed data parallel
 
 ring_allreduce: scatter-reduce（有一个数据满了就结束这一阶段）  +  allgather
 
-![image-20250319221019146](../minimind/images/image-20250319221019146.png)
+![image-20250319221019146](../my_minimind/images/image-20250319221019146.png)
 
-![image-20250319221051513](../minimind/images/image-20250319221051513.png)
+![image-20250319221051513](../my_minimind/images/image-20250319221051513.png)
 
 
 
-![image-20250319220654786](../minimind/images/image-20250319220654786.png)
+![image-20250319220654786](../my_minimind/images/image-20250319220654786.png)
 
-![image-20250319221259577](../minimind/images/image-20250319221259577.png)
+![image-20250319221259577](../my_minimind/images/image-20250319221259577.png)
 
 ### DeepSpeed ZeRO-1 (zero redundancy optimizer 零冗余优化器)
 
@@ -693,9 +693,9 @@ FP32精度的重要性：优化器使用FP32存储梯度以确保数值稳定性
 梯度缩放（Gradient Scaling）：为防止FP16梯度下溢，混合精度训练通常对梯度进行放大（Scale），再将缩放的FP16梯度转换为FP32用于更新。此过程需要在全局范围内统一处理，无法逐层操作。
 ```
 
-![image-20250319222321451](../minimind/images/image-20250319222321451.png)
+![image-20250319222321451](../my_minimind/images/image-20250319222321451.png)
 
-![image-20250319222303536](../minimind/images/image-20250319222303536.png)
+![image-20250319222303536](../my_minimind/images/image-20250319222303536.png)
 
 ### DeepSpeed ZeRO-2
 
@@ -703,7 +703,7 @@ FP32精度的重要性：优化器使用FP32存储梯度以确保数值稳定性
 
 梯度收集：1
 
-![image-20250319224601012](../minimind/images/image-20250319224601012.png)
+![image-20250319224601012](../my_minimind/images/image-20250319224601012.png)
 
 ### DeepSpeed ZeRO-3
 
@@ -711,7 +711,7 @@ FP32精度的重要性：优化器使用FP32存储梯度以确保数值稳定性
 
 梯度收集：1
 
-![image-20250319224314692](../minimind/images/image-20250319224314692.png)
+![image-20250319224314692](../my_minimind/images/image-20250319224314692.png)
 
 ### 显存节省分析
 
@@ -721,7 +721,7 @@ os+g：zero2   共享gradient
 
 os+g+p：zero3   共享gradient，parameter
 
-![image-20250319224347437](../minimind/images/image-20250319224347437.png)
+![image-20250319224347437](../my_minimind/images/image-20250319224347437.png)
 
 ## 梯度检查点gradient checkpoint/激活值检查点activation checkpoint  
 
@@ -729,9 +729,9 @@ os+g+p：zero3   共享gradient，parameter
 
 反向传播时神经网络默认保存所有梯度，gradient checkpoint可以选择性保存一些梯度来节省显存，未保存的梯度可以计算得到
 
-![image-20250319231033758](../minimind/images/image-20250319231033758.png)
+![image-20250319231033758](../my_minimind/images/image-20250319231033758.png)
 
-![image-20250319231006486](../minimind/images/image-20250319231006486.png)
+![image-20250319231006486](../my_minimind/images/image-20250319231006486.png)
 
 ## KV cache
 
@@ -739,7 +739,7 @@ https://www.bilibili.com/video/BV1kx4y1x7bu/?spm_id_from=333.1387.upload.video_c
 
 由于自注意力机制，每一token只能看到自己之前的token；对新的token非常，用Q查询前面所有的K得到权重，再乘以V得到注意力分数；因此使用KV cache保存以前token的kv，节省计算
 
-![image-20250320105437842](../minimind/images/image-20250320105437842.png)
+![image-20250320105437842](../my_minimind/images/image-20250320105437842.png)
 
 ## VLLM（**Very Large Language Model Inference Framework**）
 
@@ -751,9 +751,9 @@ https://www.bilibili.com/video/BV1kx4y1x7bu/?spm_id_from=333.1387.upload.video_c
 
 类似操作系统
 
-![image-20250320110026574](../minimind/images/image-20250320110026574.png)
+![image-20250320110026574](../my_minimind/images/image-20250320110026574.png)
 
-![image-20250320110128888](../minimind/images/image-20250320110128888.png)
+![image-20250320110128888](../my_minimind/images/image-20250320110128888.png)
 
 - **问题背景**：传统注意力机制在处理长序列时，键值（KV）缓存需预分配连续显存，导致显存碎片化，限制并发请求数和吞吐量。
 - 解决方案
@@ -767,22 +767,22 @@ vLLM的SamplingParameter里有个参数n， n: Number of output sequences to ret
 
 例如下面给出翻译的两种输出
 
-![image-20250320110742116](../minimind/images/image-20250320110742116.png)
+![image-20250320110742116](../my_minimind/images/image-20250320110742116.png)
 
 ### **连续批处理（Continuous Batching）**
 
 - **动态请求调度**：将多个用户请求的 tokens 打包为统一批次，实时动态调整批次大小，避免传统静态批处理的等待延迟。
 - **优势**：GPU 利用率提升 **5-10 倍**，尤其适合流式输出场景。
 
-![image-20250319232758455](../minimind/images/image-20250319232758455.png)
+![image-20250319232758455](../my_minimind/images/image-20250319232758455.png)
 
 ## Flash Attention
 
 HBM 是 **High Bandwidth Memory** 的缩写，中文称为**高带宽内存**。它是一种用于高性能计算和图形处理的高性能内存技术，主要用于 GPU（图形处理器）、AI 加速器和数据中心等领域。HBM 通过将内存芯片堆叠在一起，并与处理器通过高密度互连技术直接连接，显著提高了内存带宽和能效。
 
-![image-20250320150459317](../minimind/images/image-20250320150459317.png)
+![image-20250320150459317](../my_minimind/images/image-20250320150459317.png)
 
-![image-20250320150630354](../minimind/images/image-20250320150630354.png)
+![image-20250320150630354](../my_minimind/images/image-20250320150630354.png)
 
 1. **分块（Tiling）**
    将输入序列分为多个小块（例如每块 64-128 个 token），每次仅处理一小块，避免一次性加载整个 QKᵀ 矩阵。
@@ -791,17 +791,17 @@ HBM 是 **High Bandwidth Memory** 的缩写，中文称为**高带宽内存**。
 3. **重计算（Recomputation）**
    反向传播时，通过存储少量元数据（如随机数种子）重新生成中间结果，避免显存占用。
 
-![image-20250320152939108](../minimind/images/image-20250320152939108.png)
+![image-20250320152939108](../my_minimind/images/image-20250320152939108.png)
 
 
 
-![image-20250320152958609](../minimind/images/image-20250320152958609.png)
+![image-20250320152958609](../my_minimind/images/image-20250320152958609.png)
 
-![image-20250320163729777](../minimind/images/image-20250320163729777.png)
+![image-20250320163729777](../my_minimind/images/image-20250320163729777.png)
 
- ![image-20250320163644708](../minimind/images/image-20250320163644708.png)
+ ![image-20250320163644708](../my_minimind/images/image-20250320163644708.png)
 
-![image-20250320153020336](../minimind/images/image-20250320153020336.png)
+![image-20250320153020336](../my_minimind/images/image-20250320153020336.png)
 
 ```
 算法流程：
@@ -824,7 +824,7 @@ l_i_new：存储第i行0到j列每一行的总和（-m_i_new因为指数函数�
 
 ## DPO
 
-![image-20250317133142181](../minimind/images/image-20250317133142181.png)
+![image-20250317133142181](../my_minimind/images/image-20250317133142181.png)
 
 https://www.bilibili.com/list/watchlater?oid=1201309534&bvid=BV1GF4m1L7Nt&spm_id_from=333.1365.top_right_bar_window_view_later.content.click
 
@@ -846,17 +846,17 @@ Readme里的图片目录。
 
 模型文件夹。
 
-### model/minimind_tokenizer
+### model/my_minimind_tokenizer
 
 项目自定义的Tokenizer模型文件。
 
-- model/minimind_tokenizer/merges.txt
+- model/my_minimind_tokenizer/merges.txt
   merges文件存放的是训练tokenizer阶段所得到的合并词表结果，就是tokenizer.json中，model.merges下的内容。
-- model/minimind_tokenizer/tokenizer_config.json
+- model/my_minimind_tokenizer/tokenizer_config.json
   分词器的配置信息，定义了分词器的版本、额外添加的标记（tokens）、结构/代码和模型参数等信息，比如tokenizer_class指定使用的分词器类名以及model_max_length指定模型能够处理的最大序列长度 和 bos_token指定句首的标记等内容。
-- model/minimind_tokenizer/tokenizer.json
+- model/my_minimind_tokenizer/tokenizer.json
   最终的分词器模型文件，包含了分词器的版本号、分词器的截断、填充策略、特殊标记、文本归一化的函数、预分词的策略或方法、分词器模型的类型、词汇表（vocab）和合并规则（merges）等信息。
-- model/minimind_tokenizer/vocab.json
+- model/my_minimind_tokenizer/vocab.json
   词表文件，就是tokenizer.json中，model.vocab下的内容。
 
 *注：分词器训练代码可见`train_tokenizer.py`*
