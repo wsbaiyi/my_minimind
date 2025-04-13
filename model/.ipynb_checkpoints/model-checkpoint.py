@@ -316,8 +316,7 @@ class MOEFeedForward(nn.Module):
             x = x.repeat_interleave(self.config.num_experts_per_tok, dim=0)# (b*s*top_k,dim)
             y = torch.empty_like(x, dtype=torch.float16)# (b*s*top_k,dim)
             for i, expert in enumerate(self.experts):
-                # flat_topk_idx == i表示取出当前专家所负责的token的索引（数量不固定），举例来说
-                # 如果flat_topk_idx[t] == i 就表示 第t//top_k个token由第i个专家负责  ，且这个专家是top_k中的第 t%top_k个专家
+                # flat_topk_idx == i表示取出当前专家所负责的token的索引（数量不固定）
                 y[flat_topk_idx == i] = expert(x[flat_topk_idx == i]).to(y.dtype)  # 确保类型一致
             # 乘以权重，求和
             y = (y.view(*topk_weight.shape, -1) * topk_weight.unsqueeze(-1)).sum(dim=1)

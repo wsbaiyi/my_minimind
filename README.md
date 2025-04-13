@@ -104,16 +104,12 @@ SFT阶段就需要把半成品LLM施加一个自定义的聊天模板进行微�
 >
 > 执行监督微调，得到 `full_sft_*.pth` 作为指令微调的输出权重（其中`full`即为全参数微调）
 >
-> <details style="color:rgb(128,128,128)">
-> <summary>注：训练须知</summary>
->
 > 
->
 > 所有训练过程默认每隔100步保存1次参数到文件`./out/***.pth`（每次会覆盖掉旧权重文件）。
 >
 > 简单起见，此处只写明两个阶段训练过程。如需其它训练 (LoRA, 蒸馏, 强化学习, 微调推理等) 可参考下文【实验】小节的详细说明。
 
-### 人类反馈强化学习(Reinforcement Learning from Human Feedback, RLHF)**
+### 人类反馈强化学习(Reinforcement Learning from Human Feedback, RLHF)
 
 在前面的训练步骤中，模型已经具备了基本的对话能力，但是这样的能力完全基于单词接龙，缺少正反样例的激励。
 模型此时尚未知什么回答是好的，什么是差的。我们希望它能够更符合人的偏好，降低让人类不满意答案的产生概率。
@@ -269,10 +265,6 @@ python train_distill_reason.py
 python eval_model.py --model_mode 1 # 默认为0：测试pretrain模型效果，设置为1：测试full_sft模型效果
 ```
 
-<details style="color:rgb(128,128,128)">
-<summary>注：测试须知</summary>
-
-
 
 如需详情，查看`eval_model.py`脚本代码即可。model_mode分为 0: 预训练模型，1: SFT-Chat模型，2: RLHF-Chat模型，3: Reason模型
 
@@ -299,6 +291,8 @@ python eval_model.py --model_mode 1 # 默认为0：测试pretrain模型效果，
 
 ```bash
 {"text": "如何才能摆脱拖延症？ 治愈拖延症并不容易，但以下建议可能有所帮助..."}
+
+{"text": "<s>如何才能摆脱拖延症？ 治愈拖延症并不容易，但以下建议可能有所帮助...</s>"}
 ```
 
 ### SFT数据
@@ -316,6 +310,13 @@ python eval_model.py --model_mode 1 # 默认为0：测试pretrain模型效果，
         {"role": "assistant", "content": "再见！"}
     ]
 }
+
+# <s>system
+# 你是 MiniMind，是一个有用的人工智能助手。</s>
+# <s>user
+# 请用一段话描述阿里巴巴集团的企业文化。</s>
+# <s>assistant
+# 阿里巴巴集团的企业文化以“客户第一、员工第二、股东第三”为核心价值观，强调“让天下没有难做的生意”的使命。</s>
 ```
 
 ### RLHF数据
