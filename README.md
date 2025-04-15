@@ -262,7 +262,10 @@ python train_distill_reason.py
 也可以直接去[此处](https://www.modelscope.cn/models/gongjy/my_minimind2-PyTorch/files)下载使用我训练的`*.pth`文件。
 
 ```bash
-python eval_model.py --model_mode 1 # 默认为0：测试pretrain模型效果，设置为1：测试full_sft模型效果
+python eval_model.py --model_mode 1 # 默认为0：测试pretrain模型效果，设置为1：测试full_sft模型效果 0: 预训练模型，1: SFT-Chat模型，2: RLHF-Chat模型，3: Reason模型
+
+python eval_vlm.py --model_mode 1 # 0: Pretrain模型，1: SFT模型，2: SFT-多图模型 (beta拓展)
+
 ```
 
 
@@ -1333,3 +1336,466 @@ RLHF 的过程通常会持续多轮，这是一个复杂的迭代优化过程，
 ![image-20250329163008380](pic/image-20250329163008380.png)
 
 相较于最终的预测分布，中间层特征提供了更为丰富的模型信息，有助于在模型蒸馏过程中实现更为有效的知识迁移。
+
+
+
+
+
+
+
+# Deepseek
+
+## deepseek-v3
+
+pre-training remarkably stable
+
+two architecture：MLA(multi-head latent attention) Moe(mixture of experts)
+
+two strategies：auxiliary-loss-free + MTP(multi-token-prediction training objective)
+
+FP8 mixed precision
+
+DualPine
+
+
+
+### MLA：inference
+
+```
+用低维的向量或矩阵取代原始的kv cache里的kv；仅cache c
+```
+
+#### **kv-cache**：空间换时间
+
+```
+attentions实际是矩阵相乘得到correlation
+
+QK^T由于是因果模型，第一个token看不到后面的输出，需要mask掩码
+不需要每次重复计算K,V，直接concat复用
+由于只需要attention的最后一行，只需要计算Q的最后一行，因此q不需要cache
+```
+
+![image-20250414222734715](pic/image-20250414222734715.png)
+
+#### low-rank kv
+
+```
+压缩到低维存储，类似lora
+使用时再投影恢复
+```
+
+![image-20250414223520322](pic/image-20250414223520322.png)
+
+```
+仅cache c
+```
+
+![image-20250414223746942](pic/image-20250414223746942.png)
+
+```
+##trick  abosorb 参数矩阵
+做推理的时候，不用计算k,v；直接用一个参数矩阵代替两个参数矩阵相乘，减少参数量
+```
+
+![image-20250414224008978](pic/image-20250414224008978.png)
+
+```
+同时对q也进行了压缩
+但是和kv不是同一个参数矩阵
+```
+
+![image-20250414224224489](pic/image-20250414224224489.png)
+
+#### **rotary position embeding**（absolute+relative）
+
+绝对位置：对长句子不好（扩展性差）
+
+相对位置：计算复杂
+
+```
+relative可能会改变角度和长度
+rope仅会改变角度
+```
+
+![image-20250414224905015](pic/image-20250414224905015.png)
+
+```
+rope给qk乘上一个旋转矩阵，每个旋转矩阵代表token的absolute位置，attn的结果代表relative位置
+```
+
+![image-20250414225155043](pic/image-20250414225155043.png)
+
+```
+rope导致kv cache出现问题：
+kv cache隐含假设是以前的k和v永远是相同的
+2，q是欢位置是0，此时的k的旋转矩阵按照0算，此时kv存入位置0的kv
+3，q是迎位置是1，此时的k的旋转矩阵按照1算，此时kv存入位置1的kv
+导致kv cache不对
+```
+
+![image-20250414230050677](pic/image-20250414230050677.png)
+
+```
+rope导致参数矩阵abosorb失败
+R跟position有关系，w参数矩阵和位置无关
+```
+
+![image-20250414230832728](pic/image-20250414230832728.png)
+
+#### 解决kv cache和rope问题
+
+```
+取q和k的小部分apply rope；再和另一部分未经过rope的数据concat；计算
+
+结合了rope位置编码的优点和low-rank参数量小的优点
+```
+
+![image-20250414231551311](pic/image-20250414231551311.png)
+
+### Moe：training
+
+#### **origin moe**
+
+```
+dense moe计算所有的ffn加权平均
+sparse moe计算top k的加权平均
+
+
+moe好处：仅计算少数的expert，花费少；每个expert可以学习专长特征
+```
+
+![image-20250415094553846](pic/image-20250415094553846.png)
+
+#### deepseek moe
+
+```
+改进:
+1.划分多个expert
+减少中间维度，增加expert数量，因此参数数量大致不变
+类似model ensemble, 降低varience，提高模型性能
+
+2.添加shared expert
+学习公共的知识
+```
+
+![image-20250415094958016](pic/image-20250415094958016.png)
+
+#### auxiliary-loss-free load balancing 
+
+负载均衡
+
+```
+MoE 训练中一个关键挑战是负载均衡——某些专家可能被过度使用，而其他专家则被冷落。这不仅会导致计算资源的浪费（如部分设备闲置），还可能引发路由崩溃（Routing Collapse），即模型仅依赖少数专家，无法充分利用所有专家能力。
+
+传统解决方案通过引入辅助损失（Auxiliary Loss） 强制均衡专家负载，但这种方法存在明显缺陷：辅助损失会向模型注入干扰梯度，与主任务（如语言建模）的优化目标冲突，导致模型性能下降。为此，本文提出了一种全新的无辅助损失负载均衡策略（Loss-Free Balancing），通过动态调整路由得分偏置（Bias）实现负载均衡，同时避免引入额外梯度干扰。实验表明，该方法在1B和3B参数规模的MoE模型上均取得了更优的负载均衡效果和模型性能。
+
+
+
+在softmax前加一个bias
+如果希望增大某个expert的token数，则加上一个较大的b增大概率
+```
+
+![image-20250415112541701](pic/image-20250415112541701.png)
+
+### MTP：enhance model
+
+```
+优点：
+1. trianing efficience
+2. reasoning
+```
+
+#### 以前的mtp
+
+```
+deepseek将inference阶段的EAGLE的causal模型替换train阶段的meata MTP的parallel heads模型
+```
+
+![image-20250415113246227](pic/image-20250415113246227.png)
+
+#### llm train和Inference
+
+```
+train阶段每次都是用ground truth来训练
+存在的问题：
+1.每次用truth训练
+2.每次预测一个token（短视）
+3.training signal差 
+
+
+实际上trian过程是并行的auto regressive，指将一整个句子输入，获得一整个输出；为了保证causal，需要mask
+本质上还是预测一个token
+```
+
+![image-20250415113756534](pic/image-20250415113756534.png)
+
+```
+inference阶段每次将上一次预测的作为输入
+```
+
+![image-20250415113949336](pic/image-20250415113949336.png)
+
+#### meta MTP
+
+![image-20250415114525346](pic/image-20250415114525346.png)
+
+```
+hard transition：比如5预测A
+
+one token prediction：此时hard transition的比例是1/7，权重是0.14
+three token prediction：此时hard transition的比例是2/7，权重是0.28；可以学到更多的hard transition
+
+缺点：
+parallel heads：1预测多个token 2，3，4，违背了causal（因为3和2应该是有因果的）
+```
+
+![image-20250415114856619](pic/image-20250415114856619.png)
+
+#### speculative decoding
+
+```
+有两种形式：
+1. small LLM
+2. heads（self)
+```
+
+![image-20250415151412706](pic/image-20250415151412706.png)
+
+```
+用一个大模型和一个小模型
+
+token先给小模型处理，用大模型验证，并用大模型重新处理小模型预测错误的token
+```
+
+![image-20250415151500307](pic/image-20250415151500307.png)
+
+![image-20250415151735664](pic/image-20250415151735664.png)
+
+```
+将小模型嵌入大模型，也就是用自己的heads作为小模型，有两者形式：
+Medusa: 并行预测
+EAGLE: casual预测
+```
+
+![image-20250415151952344](pic/image-20250415151952344.png)
+
+![image-20250415120628021](pic/image-20250415120628021.png)
+
+#### deepseek MTP
+
+```
+deeepseek MTP有两个MTP module
+将main model输出之前的feature输送到MTP model1，这样MTP model1既有以前token的预测输出也有当前token的embed
+最后计算三个Loss的平均值
+
+inference不需要MTP module
+
+
+使用MTP提高了planning规划和reasoning推理能力
+planning: main model输送的feature包含对feature token有帮助的信息，具有planning
+reasoning
+```
+
+
+
+![image-20250415153414784](pic/image-20250415153414784.png)
+
+## deepseek-R1
+
+### top-down
+
+```
+COT: chain of thought
+
+AGI：artificial general intelligence 通用人工智能
+
+deepseek-R1注重提高reasoning ability
+```
+
+![image-20250415154636605](pic/image-20250415154636605.png)
+
+### 两个版本
+
+```
+pre-training
+post-training:SFT+RLHF
+
+deepseek-R1-zero:不用SFT,直接使用RLHF
+可读性差，语言混杂
+
+deepseek-R1:少量SFT，接着RLHF
+cold-start data + multi-stage+training + bootstraping
+
+贡献:
+post-training
+distillation
+```
+
+### RL
+
+#### sl和RL
+
+```
+AGI：artificial general intelligence 通用人工智能
+
+sl memorise：无法超过人类
+RL generize：可以超过人类
+```
+
+![image-20250415161800384](pic/image-20250415161800384.png)
+
+```
+RL和SFT的对比
+
+sft:训练一个NN，让pred越接近ground truth，每一步都有ground truth
+
+rl：仅在最后才给出reward
+policy based 预测采取哪个action后reward大 （player)
+value based 评价当前state action的好坏 (coach)
+actor-critic= policy based  + value based 
+```
+
+![image-20250415162256736](pic/image-20250415162256736.png)
+
+```
+RL的特点
+```
+
+![image-20250415163102770](pic/image-20250415163102770.png)
+
+#### alphaGo和alphaZero
+
+```
+alphaGo
+本质上是search算法，只是用到了rl
+stage1 supervised训练一个初始模型
+stage2 self-play产生data，并训练一个policy model
+stage3 使用data训练value model
+
+alphaZero 将stage1的supervised去掉了；超过了人类水平；证明不需要人类的先验知识
+```
+
+![image-20250415163931405](pic/image-20250415163931405.png)
+
+### background
+
+#### scaling law
+
+```
+模型越大，性能越强
+
+GPT: less structure，性能极限更高 scale up（data,model,compute)
+```
+
+![image-20250415172011098](pic/image-20250415172011098.png)
+
+#### openAI训练的范式
+
+```
+pre-training
+post-training:sft,reward model,ppo
+
+
+
+DPO不需要reward model
+
+deepseek只有sft和rule-based
+rule-based：对reward model的调整，使结果符合rule，防止出现reward-hacking
+```
+
+![image-20250415173527412](pic/image-20250415173527412.png)
+
+![image-20250415174501708](pic/image-20250415174501708.png)
+
+#### emergent ability
+
+```
+涌现:当模型超过一定大小，性能会极大提高
+```
+
+### COT：chain of thought
+
+![image-20250415181610559](pic/image-20250415181610559.png)
+
+#### 早期：prompt engineering
+
+```
+think
+
+zero-shot：不提供范例
+few-shot：提供少数范例
+zero-shot-cot：step by step
+
+COT prompting：最强性能
+```
+
+![image-20250415175833136](pic/image-20250415175833136.png)
+
+![image-20250415180438469](pic/image-20250415180438469.png)
+
+#### SFT阶段：收集COT标注的数据训练大模型产生COT
+
+```
+如何产生COT数据
+
+self-consistent：COT example+Q给llm生成多个A,使用majority voting选择正确的A
+self-training：将self-consistent生产的QA对作为新的COT example
+```
+
+![image-20250415180853865](pic/image-20250415180853865.png)
+
+#### RL阶段：训练大模型产生更好的COT
+
+```
+COT可以作用在SFT和RL阶段
+
+COT的reward model有两种
+在rl框架下reward model
+在test tiem compute框架下verifier
+```
+
+![image-20250415181610559](pic/image-20250415181610559.png)
+
+```
+类似self-consistent：不同的是对所有的预测s用verifier大模型得到score，最后选择最大的score作为结果；而不是用majority vote
+
+由于是在inference/test阶段进行的，所有叫test time compute
+```
+
+![image-20250415182325807](pic/image-20250415182325807.png)
+
+```
+验证cot是否正确： 
+final answer：直接计算最后的答案好不好；选出yes的cot
+orm：outcome reward model  对整个cot打分；选出最好的cot
+prm：process reward model  对cot的每一个step打分；选出每一步的最佳step，根据此step生成下一step
+```
+
+![image-20250415183505052](pic/image-20250415183505052.png)
+
+```
+deepseek-R1使用的是 SFT+final answer RL+majority voting
+orm 和prm的结果明显好于deepseek-R1
+可能是因为deepseek-R1使用的是GRPO，而且参数量是657B,由于emerging ability 和scaling law导致性能更好
+```
+
+![image-20250415183956081](pic/image-20250415183956081.png)
+
+### R1的训练
+
+```
+round1: reasoning
+
+
+round2: reasoning+general
+reasoning data是由round1产生的data传给V3打分得到的（这一过程叫rejection sampling；得到的是高质量的reasoning data）
+
+```
+
+![image-20250415191159995](pic/image-20250415191159995.png)
+
+### distilling
+
+```
+具有强推理能力的大模型蒸馏后推理能力仍强
+```

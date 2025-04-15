@@ -15,9 +15,9 @@ from contextlib import nullcontext
 
 from transformers import AutoTokenizer
 
-from model.model import MiniMindLM
-from model.LMConfig import LMConfig
-from model.dataset import PretrainDataset
+from .model import MiniMindLM
+from .LMConfig import LMConfig
+from .dataset import PretrainDataset
 
 warnings.filterwarnings('ignore')
 
@@ -105,7 +105,7 @@ def train_epoch(epoch, wandb):
 
 
 def init_model(lm_config):
-    tokenizer = AutoTokenizer.from_pretrained('/root/llm_learn/model/minimind_tokenizer')
+    tokenizer = AutoTokenizer.from_pretrained('./model/minimind_tokenizer')
 
     # pretrain model
     model = MiniMindLM(lm_config).to(args.device)
@@ -156,14 +156,14 @@ if __name__ == "__main__":
     parser.add_argument('--n_layers', default=8, type=int)
     parser.add_argument('--max_seq_len', default=512, type=int)
     parser.add_argument('--use_moe', default=False, type=bool)
-    parser.add_argument("--data_path", type=str, default="/root/pretrain_hq.jsonl")
+    parser.add_argument("--data_path", type=str, default="./datasets/pretrain_hq.jsonl")
 
     # 用户输入的参数保存在args中
     args = parser.parse_args()
 
     lm_config = LMConfig(dim=args.dim, n_layers=args.n_layers, max_seq_len=args.max_seq_len, use_moe=args.use_moe)
     # args.save_dir = os.path.join(args.out_dir)
-    args.save_dir = '/root/train_res'
+    args.save_dir = './train_res'
     os.makedirs(args.save_dir, exist_ok=True)
     os.makedirs(args.out_dir, exist_ok=True)
     tokens_per_iter = args.batch_size * lm_config.max_seq_len

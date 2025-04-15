@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 import os
 import ast
 from PIL import Image
-from model.model_vlm import MiniMindVLM
+from .model_vlm import MiniMindVLM
 
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"

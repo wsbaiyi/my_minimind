@@ -6,8 +6,8 @@ import torch
 import warnings
 from PIL import Image
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from model.model_vlm import MiniMindVLM
-from model.VLMConfig import VLMConfig
+from .model.model_vlm import MiniMindVLM
+from .model.VLMConfig import VLMConfig
 from transformers import logging as hf_logging
 
 hf_logging.set_verbosity_error()
@@ -20,7 +20,7 @@ def count_parameters(model):
 
 
 def init_model(lm_config, device):
-    tokenizer = AutoTokenizer.from_pretrained('/root/minimind-v/model/minimind_tokenizer')
+    tokenizer = AutoTokenizer.from_pretrained('./model/minimind_tokenizer')
     if args.load == 0:
         moe_path = '_moe' if args.use_moe else ''
         modes = {0: 'pretrain_vlm', 1: 'sft_vlm', 2: 'sft_vlm_multi'}
@@ -105,7 +105,7 @@ if __name__ == "__main__":
                     history_idx = 0
                     for y in outputs:
                         answer = tokenizer.decode(y[0].tolist(), skip_special_tokens=True)
-                        if (answer and answer[-1] == '�') or not answer:
+                        if (answer and answer[-1] == ' ') or not answer:
                             continue
                         print(answer[history_idx:], end='', flush=True)
                         history_idx = len(answer)
@@ -116,7 +116,7 @@ if __name__ == "__main__":
 
     # 单图推理：每1个图像单独推理
     if args.use_multi == 1:
-        image_dir = '/root/llm_learn/test_img/eval_images'
+        image_dir = './test_img/eval_images'
         prompt = f"{model.params.image_special_token}\n描述一下这个图像的内容。"
 
         for image_file in os.listdir(image_dir):
@@ -127,7 +127,7 @@ if __name__ == "__main__":
     # 2图推理：目录下的两个图像编码，一次性推理（power by ）
     if args.use_multi == 2:
         args.model_mode = 2
-        image_dir = './dataset/eval_multi_images/bird/'
+        image_dir = './test_img/eval_multi_images/bird/'
         prompt = (f"{lm_config.image_special_token}\n"
                   f"{lm_config.image_special_token}\n"
                   f"比较一下两张图像的异同点。")
