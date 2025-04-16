@@ -447,6 +447,8 @@ my_minimind-MoE模型，它的结构基于Llama3和[Deepseek-V2/3](https://arxiv
 
 ## RoPE（Rotary Position Embedding）
 
+### 简单了解
+
 R(theta)就是旋转矩阵
 
 ![image-20250318110543999](../my_minimind/images/image-20250318110543999.png)
@@ -458,6 +460,38 @@ R(theta)就是旋转矩阵
 看作是钟表；m和n是token的位置
 
 ![image-20250318110639726](../my_minimind/images/image-20250318110639726.png)
+
+### 具体公式
+
+https://www.bilibili.com/video/BV12x42127Pb?spm_id_from=333.788.videopod.sections&vd_source=edb614e9f3e817577f46a2e9deeca011
+
+![image-20250416100708654](pic/image-20250416100708654.png)
+
+![image-20250416100830215](pic/image-20250416100830215.png)
+
+![image-20250416100923520](pic/image-20250416100923520.png)
+
+### 设计公式验证
+
+![image-20250416101224278](pic/image-20250416101224278.png)
+
+![image-20250416101251052](pic/image-20250416101251052.png)
+
+### 二维到多维
+
+![image-20250416101402998](pic/image-20250416101402998.png)
+
+![image-20250416101649364](pic/image-20250416101649364.png)
+
+#### **代码实现**
+
+```
+不需要按照相邻两两组合奇偶位置；因为神经元是无序的，不依赖维度顺序
+
+chatglm中为了高效地实现 RoPE，把向量在内存中重新排列成前后两部分，而不是严格按照奇偶位置。这样做是为了充分利用硬件的并行计算能力。
+```
+
+![image-20250416102436015](pic/image-20250416102436015.png)
 
 ## LoRA（Low-Rank Adaptation of Large Language Models）
 
