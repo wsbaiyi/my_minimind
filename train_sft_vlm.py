@@ -16,9 +16,9 @@ from torch import optim, nn
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader, DistributedSampler
 from transformers import AutoTokenizer, AutoModel
-from model.model_vlm import MiniMindVLM
-from model.VLMConfig import VLMConfig
-from model.dataset import *
+from models.model_vlm import MiniMindVLM
+from models.VLMConfig import VLMConfig
+from models.dataset import *
 
 warnings.filterwarnings('ignore')
 
@@ -101,9 +101,9 @@ def train_epoch(epoch, wandb):
 
 
 def init_model(model_config: VLMConfig):
-    tokenizer = AutoTokenizer.from_pretrained('/root/llm_learn/model/minimind_tokenizer')
+    tokenizer = AutoTokenizer.from_pretrained('./model/minimind_tokenizer')
     moe_path = '_moe' if model_config.use_moe else ''
-    ckp = f'/root/train_res/pretrain_vlm_{model_config.dim}{moe_path}.pth'
+    ckp = f'./train_res/pretrain_vlm_{model_config.dim}{moe_path}.pth'
 
     model = MiniMindVLM(model_config)
     state_dict = torch.load(ckp, map_location=args.device)
@@ -112,6 +112,7 @@ def init_model(model_config: VLMConfig):
 
     Logger(f'VLM可训练参数量：{sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6:.3f} 百万')
 
+    # 得到preprocess
     _, preprocess = MiniMindVLM.get_vision_model()
     return model.to(args.device), tokenizer, preprocess
 
@@ -139,8 +140,8 @@ if __name__ == "__main__":
     parser.add_argument("--use_wandb", default=False, action="store_true")
     parser.add_argument("--wandb_project", type=str, default="MiniMind-V")
     parser.add_argument("--num_workers", type=int, default=8)
-    parser.add_argument("--data_path", type=str, default="/root/sft_vlm_data.jsonl")
-    parser.add_argument("--images_path", type=str, default="/root/sft_images")
+    parser.add_argument("--data_path", type=str, default="./datasets/sft_vlm_data.jsonl")
+    parser.add_argument("--images_path", type=str, default="./sft_images")
     parser.add_argument("--ddp", action="store_true")
     parser.add_argument("--accumulation_steps", type=int, default=1)
     parser.add_argument("--grad_clip", type=float, default=1.0)
@@ -157,7 +158,7 @@ if __name__ == "__main__":
     model_config = VLMConfig(dim=args.dim, n_layers=args.n_layers, max_seq_len=args.max_seq_len)
     max_seq_len = model_config.max_seq_len
     # args.save_dir = os.path.join(args.out_dir)
-    args.save_dir = f'/root/train_res'
+    args.save_dir = f'./train_res'
     os.makedirs(args.save_dir, exist_ok=True)
     os.makedirs(args.out_dir, exist_ok=True)
     tokens_per_iter = args.batch_size * max_seq_len

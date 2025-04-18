@@ -15,9 +15,9 @@ from torch import optim, nn
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader, DistributedSampler
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from model.model import MiniMindLM
-from model.LMConfig import LMConfig
-from model.dataset import SFTDataset
+from models.model import MiniMindLM
+from models.LMConfig import LMConfig
+from models.dataset import SFTDataset
 
 warnings.filterwarnings('ignore')
 
@@ -35,6 +35,8 @@ def get_lr(current_step, total_steps, lr):
 
 def train_epoch(epoch, wandb):
     
+    '''
+    '''
     # 思考标签占位符
     start_of_think_ids = tokenizer('<think>').input_ids
     end_of_think_ids = tokenizer('</think>').input_ids
@@ -52,6 +54,8 @@ def train_epoch(epoch, wandb):
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
 
+        '''
+        '''
         with ctx:
             res = model(X)
             loss = loss_fct(
@@ -65,8 +69,6 @@ def train_epoch(epoch, wandb):
             
             loss_mask = loss_mask.view(-1)
             loss_mask_sum = loss_mask.sum()
-
-
             # 加大<think><answer>位置的loss
             # 增加标记位置的权重为原来的10倍，使得模型输出符合<think><answer>的模式
             # 通常在训练模型时，损失函数中不同位置的错误可能被平等对待。如果某些位置（如<answer>标签内的位置）的预测错误对整体结果影响更大，
@@ -121,10 +123,10 @@ def train_epoch(epoch, wandb):
 
 
 def init_model(lm_config):
-    tokenizer = AutoTokenizer.from_pretrained('/root/minimind/model/minimind_tokenizer')
+    tokenizer = AutoTokenizer.from_pretrained('./model/minimind_tokenizer')
     model = MiniMindLM(lm_config)
     moe_path = '_moe' if lm_config.use_moe else ''
-    ckp = f'/root/train_res/rlhf_{lm_config.dim}{moe_path}.pth'
+    ckp = f'./train_res/rlhf_{lm_config.dim}{moe_path}.pth'
 
     # 加载rlhf模型
     state_dict = torch.load(ckp, map_location=args.device)
@@ -168,12 +170,12 @@ if __name__ == "__main__":
     parser.add_argument('--n_layers', default=8, type=int)
     parser.add_argument('--max_seq_len', default=1024, type=int)
     parser.add_argument('--use_moe', default=False, type=bool)
-    parser.add_argument("--data_path", type=str, default="/root/r1_mix_1024.jsonl")
+    parser.add_argument("--data_path", type=str, default="./datasets/r1_mix_1024.jsonl")
 
     args = parser.parse_args()
 
     lm_config = LMConfig(dim=args.dim, n_layers=args.n_layers, max_seq_len=args.max_seq_len, use_moe=args.use_moe)
-    args.save_dir = '/root/train_res'
+    args.save_dir = './train_res'
     os.makedirs(args.save_dir, exist_ok=True)
     os.makedirs(args.out_dir, exist_ok=True)
     tokens_per_iter = args.batch_size * lm_config.max_seq_len
@@ -198,7 +200,8 @@ if __name__ == "__main__":
 
     model, tokenizer = init_model(lm_config)
 
-
+    '''
+    '''
     # SFTDataset
     train_ds = SFTDataset(args.data_path, tokenizer, max_length=lm_config.max_seq_len)
     

@@ -16,9 +16,9 @@ from torch import optim, nn
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader, DistributedSampler
 from transformers import AutoTokenizer, AutoModel
-from model.model_vlm import MiniMindVLM
-from model.VLMConfig import VLMConfig
-from model.dataset import VLMDataset
+from models.model_vlm import MiniMindVLM
+from models.VLMConfig import VLMConfig
+from models.dataset import VLMDataset
 
 warnings.filterwarnings('ignore')
 
@@ -47,7 +47,11 @@ def train_epoch(epoch, wandb):
             param_group['lr'] = lr
 
         with ctx:
+            '''
+            '''
+            # pixel_tensors.shape(B, 1, C, H, W)
             res = model(X, pixel_tensors=pixel_tensors)
+            
             loss = loss_fct(
                 res.logits.view(-1, res.logits.size(-1)),
                 Y.view(-1)
@@ -98,14 +102,15 @@ def train_epoch(epoch, wandb):
             }
             torch.save(clean_state_dict, ckp)
             model.train()
-
+'''
+'''
 
 def init_model(model_config: VLMConfig):
-    tokenizer = AutoTokenizer.from_pretrained('/root/minimind-v/model/minimind_tokenizer')
+    tokenizer = AutoTokenizer.from_pretrained('./model/minimind_tokenizer')
     moe_path = '_moe' if model_config.use_moe else ''
     # 加载纯语言模型权重
     # ckp = f'./out/lm_{model_config.dim}{moe_path}.pth'
-    ckp = f'/root/train_res/pretrain_512.pth'
+    ckp = f'./train_res/pretrain_512.pth'
     model = MiniMindVLM(model_config)
     state_dict = torch.load(ckp, map_location=args.device)
     model.load_state_dict(state_dict, strict=False)
@@ -152,8 +157,8 @@ if __name__ == "__main__":
     parser.add_argument("--use_wandb", default=False, action="store_true")
     parser.add_argument("--wandb_project", type=str, default="MiniMind-V")
     parser.add_argument("--num_workers", type=int, default=8)
-    parser.add_argument("--data_path", type=str, default="/root/pretrain_vlm_data.jsonl")
-    parser.add_argument("--images_path", type=str, default="/root/pretrain_images")
+    parser.add_argument("--data_path", type=str, default="./datasets/pretrain_vlm_data.jsonl")
+    parser.add_argument("--images_path", type=str, default="./pretrain_images")
     parser.add_argument("--ddp", action="store_true")
     parser.add_argument("--accumulation_steps", type=int, default=1)
     parser.add_argument("--grad_clip", type=float, default=1.0)
@@ -170,7 +175,7 @@ if __name__ == "__main__":
     model_config = VLMConfig(dim=args.dim, n_layers=args.n_layers, max_seq_len=args.max_seq_len)
     max_seq_len = model_config.max_seq_len
     # args.save_dir = os.path.join(args.out_dir)
-    args.save_dir = f'/root/train_res'
+    args.save_dir = f'./train_res'
     os.makedirs(args.save_dir, exist_ok=True)
     os.makedirs(args.out_dir, exist_ok=True)
     tokens_per_iter = args.batch_size * max_seq_len
@@ -193,6 +198,8 @@ if __name__ == "__main__":
     else:
         wandb = None
 
+    '''
+    '''
     model, tokenizer, preprocess = init_model(model_config)
 
     train_ds = VLMDataset(args.data_path, args.images_path, tokenizer, preprocess=preprocess,

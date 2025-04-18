@@ -5,14 +5,14 @@ import numpy as np
 import torch
 import warnings
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from model.model import MiniMindLM
-from model.LMConfig import LMConfig
+from models.model import MiniMindLM
+from models.LMConfig import LMConfig
 
 warnings.filterwarnings('ignore')
 
 
 def init_model(args):
-    tokenizer = AutoTokenizer.from_pretrained('/root/llm_learn/model/minimind_tokenizer')
+    tokenizer = AutoTokenizer.from_pretrained('./models/minimind_tokenizer')
     if args.load == 0:
         moe_path = '_moe' if args.use_moe else ''
         modes = {0: 'pretrain', 1: 'full_sft', 2: 'rlhf', 3: 'reason'}
@@ -31,11 +31,11 @@ def init_model(args):
         if args.lora_name != 'None':
             apply_lora(model)
             load_lora(model, f'./{args.out_dir}/lora/{args.lora_name}_{args.dim}.pth')
-    else:
-        transformers_model_path = './MiniMind2'
-        tokenizer = AutoTokenizer.from_pretrained(transformers_model_path)
-        model = AutoModelForCausalLM.from_pretrained(transformers_model_path, trust_remote_code=True)
-    print(f'MiniMind模型参数量: {sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6:.2f}M(illion)')
+    # else:
+    #     transformers_model_path = './MiniMind2'
+    #     tokenizer = AutoTokenizer.from_pretrained(transformers_model_path)
+    #     model = AutoModelForCausalLM.from_pretrained(transformers_model_path, trust_remote_code=True)
+    # print(f'MiniMind模型参数量: {sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6:.2f}M(illion)')
     return model.eval().to(args.device), tokenizer
 
 
@@ -120,7 +120,7 @@ def main():
     # 模型未经过外推微调时，在更长的上下文的chat_template时难免出现性能的明显退化，因此需要注意此处设置
     parser.add_argument('--history_cnt', default=0, type=int)
     parser.add_argument('--stream', default=True, type=bool)
-    parser.add_argument('--save_dir', default='/root/train_res')
+    parser.add_argument('--save_dir', default='./train_res')
     parser.add_argument('--load', default=0, type=int, help="0: 原生torch权重，1: transformers加载")
     parser.add_argument('--model_mode', default=0, type=int,
                         help="0: 预训练模型，1: SFT-Chat模型，2: RLHF-Chat模型，3: Reason模型")
@@ -175,7 +175,7 @@ def main():
                     history_idx = 0
                     for y in outputs:
                         answer = tokenizer.decode(y[0].tolist(), skip_special_tokens=True)
-                        if (answer and answer[-1] == '�') or not answer:
+                        if (answer and answer[-1] == ' ') or not answer:
                             continue
                         print(answer[history_idx:], end='', flush=True)
                         history_idx = len(answer)

@@ -15,9 +15,9 @@ from torch import optim, nn
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader, DistributedSampler
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from model.model import MiniMindLM
-from model.LMConfig import LMConfig
-from model.dataset import DPODataset
+from models.model import MiniMindLM
+from models.LMConfig import LMConfig
+from models.dataset import DPODataset
 
 warnings.filterwarnings('ignore')
 
@@ -32,22 +32,39 @@ def Logger(content):
 def get_lr(current_step, total_steps, lr):
     return lr / 10 + 0.5 * lr * (1 + math.cos(math.pi * current_step / total_steps))
 
-
+"""
+"""
 def logits_to_probs(logits, labels):
     # logits shape: (batch_size, seq_len, vocab_size)
     # labels shape: (batch_size, seq_len)
     # probs shape: (batch_size, seq_len)
-    log_probs = F.log_softmax(logits, dim=2)
+    """
+    将模型输出的logits转换为对应标签的概率。
+    - logits: 模型输出，形状为(batch_size, seq_len, vocab_size)
+    - labels: 目标标签，形状为(batch_size, seq_len)
+    返回形状为(batch_size, seq_len)的概率张量
+    """
+    log_probs = F.log_softmax(logits, dim=2)# 计算对数概率
 
     # index在维度2不同，其他维度一致；gather取出log_probs对应labels索引的元素
-    probs = torch.gather(log_probs, dim=2, index=labels.unsqueeze(2)).squeeze(-1)
+    probs = torch.gather(log_probs, dim=2, index=labels.unsqueeze(2)).squeeze(-1) # 获取对应标签的概率train_distill_reason.py
     return probs
 
-
+"""
+"""
 def dpo_loss(ref_probs, probs, beta):
     # ref_probs 和 probs 都是 shape: (batch_size, seq_len)
     # 公式中的π (y_w | x) 记给定x输出y_w的概率，即P(token0)*P(token2)...*P(token N)的乘积，但由于ref_probs已经是取对数了，所以可以转化为加法
     # sum还是mean????
+
+    """
+    计算DPO（Direct Preference Optimization）损失。
+    - ref_probs: 参考模型输出的概率，形状为(batch_size, seq_len)
+    - probs: 当前模型输出的概率，形状为(batch_size, seq_len)
+    - beta: 控制损失强度的超参数
+    返回标量损失值
+    """
+    # 计算序列平均概率（对数概率的均值）
     ref_probs = ref_probs.mean(dim=1)
     probs = probs.mean(dim=1)
 
@@ -61,6 +78,7 @@ def dpo_loss(ref_probs, probs, beta):
 
     # DPO 的核心是比较当前策略模型（π）与参考模型（ref）对优选和被拒响应的偏好差异。目标是让 π 对优选响应的偏好程度显著高于参考模型。
     # 鼓励 logits（即策略与参考模型的偏好差异）尽可能大，使 σ 接近 1，从而损失趋近于 0。
+    # 计算模型和参考模型的偏好差异
     pi_logratios = chosen_probs - reject_probs
     ref_logratios = chosen_ref_probs - reject_ref_probs
     logits = pi_logratios - ref_logratios
@@ -68,17 +86,21 @@ def dpo_loss(ref_probs, probs, beta):
     return loss.mean()
 
 
+"""
+"""
 def train_epoch(epoch, wandb):
     start_time = time.time()
 
     # dpo ： chosen rejected
     for step, batch in enumerate(train_loader):
-        x_chosen = batch['x_chosen'].to(args.device)
-        x_rejected = batch['x_rejected'].to(args.device)
-        y_chosen = batch['y_chosen'].to(args.device)
-        y_rejected = batch['y_rejected'].to(args.device)
-        mask_chosen = batch['mask_chosen'].to(args.device)
-        mask_rejected = batch['mask_rejected'].to(args.device)
+        # 准备数据
+        x_chosen = batch['x_chosen'].to(args.device)  # 优选样本输入
+        x_rejected = batch['x_rejected'].to(args.device)  # 被拒样本输入
+        y_chosen = batch['y_chosen'].to(args.device)  # 优选样本标签
+        y_rejected = batch['y_rejected'].to(args.device)  # 被拒样本标签
+        mask_chosen = batch['mask_chosen'].to(args.device)  # 优选样本掩码
+        mask_rejected = batch['mask_rejected'].to(args.device)  # 被拒样本掩码
+        
         x = torch.cat([x_chosen, x_rejected], dim=0)
         y = torch.cat([y_chosen, y_rejected], dim=0)
         mask = torch.cat([mask_chosen, mask_rejected], dim=0)
@@ -145,12 +167,13 @@ def train_epoch(epoch, wandb):
             torch.save(state_dict, ckp)
             model.train()
 
-
+"""
+"""
 def init_model(lm_config):
-    tokenizer = AutoTokenizer.from_pretrained('/root/minimind/model/minimind_tokenizer')
+    tokenizer = AutoTokenizer.from_pretrained('./model/minimind_tokenizer')
     model = MiniMindLM(lm_config)
     moe_path = '_moe' if lm_config.use_moe else ''
-    ckp = f'/root/train_res/full_sft_{lm_config.dim}{moe_path}.pth'
+    ckp = f'./train_res/full_sft_{lm_config.dim}{moe_path}.pth'
     state_dict = torch.load(ckp, map_location=args.device)
     
     # 加载full_sft_ model
@@ -204,12 +227,12 @@ if __name__ == "__main__":
     parser.add_argument('--n_layers', default=8, type=int)
     parser.add_argument('--max_seq_len', default=3000, type=int)
     parser.add_argument('--use_moe', default=False, type=bool)
-    parser.add_argument("--data_path", type=str, default="/root/dpo.jsonl")
+    parser.add_argument("--data_path", type=str, default="./datasets/dpo.jsonl")
 
     args = parser.parse_args()
 
     lm_config = LMConfig(dim=args.dim, n_layers=args.n_layers, max_seq_len=args.max_seq_len, use_moe=args.use_moe)
-    args.save_dir = '/root/train_res'
+    args.save_dir = './train_res'
     os.makedirs(args.save_dir, exist_ok=True)
     os.makedirs(args.out_dir, exist_ok=True)
     tokens_per_iter = args.batch_size * lm_config.max_seq_len
@@ -232,7 +255,8 @@ if __name__ == "__main__":
     else:
         wandb = None
 
-
+    """
+    """
     # ref_model
     model, ref_model, tokenizer = init_model(lm_config)
     # DPODataset
