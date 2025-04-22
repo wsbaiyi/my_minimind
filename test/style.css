@@ -1,0 +1,334 @@
+/* 基本重置和全局样式 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Roboto', sans-serif; /* YouTube 使用 Roboto 字体 */
+    background-color: #f9f9f9;
+    color: #0f0f0f;
+    /* 防止侧边栏滚动时页面滚动 */
+    /* overflow: hidden;  */ /* 如果侧边栏是固定的可以考虑 */
+}
+
+a {
+    text-decoration: none;
+    color: inherit; /* 继承父元素颜色 */
+}
+
+button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%; /* 图标按钮圆形 */
+}
+button:hover {
+    background-color: #eee;
+}
+button.menu-icon { /* 特定样式 */
+    margin-right: 15px;
+}
+
+img {
+    display: block; /* 防止图片下方有空隙 */
+    max-width: 100%; /* 图片自适应 */
+}
+
+hr {
+    border: none;
+    border-top: 1px solid #eee;
+    margin: 10px 0;
+}
+
+
+/* --- 顶部导航栏 Header --- */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 20px;
+    height: 56px; /* YouTube 标准高度 */
+    background-color: #ffffff;
+    border-bottom: 1px solid #ddd;
+    position: sticky; /* 固定在顶部 */
+    top: 0;
+    z-index: 1000; /* 确保在最上层 */
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+}
+
+.logo img {
+    height: 20px;
+    vertical-align: middle; /* 垂直居中 */
+}
+
+.header-center {
+    display: flex;
+    align-items: center;
+    flex: 0 1 728px; /* flex-grow, flex-shrink, flex-basis (YouTube常用宽度) */
+    margin: 0 40px; /* 与左右元素的间距 */
+}
+
+.search-input {
+    flex-grow: 1;
+    padding: 10px 12px;
+    border: 1px solid #ccc;
+    border-right: none;
+    border-radius: 40px 0 0 40px; /* 左侧圆角 */
+    font-size: 16px;
+    outline: none;
+}
+.search-input:focus {
+     border-color: #1c62b9;
+}
+
+.search-button {
+    padding: 6px 20px;
+    border: 1px solid #ccc;
+    background-color: #f8f8f8;
+    border-radius: 0 40px 40px 0; /* 右侧圆角 */
+    margin-left: -1px; /* 与输入框无缝连接 */
+    cursor: pointer;
+}
+.search-button svg {
+    height: 24px;
+    width: 24px;
+    fill: #606060; /* SVG 颜色 */
+}
+.search-button:hover {
+    background-color: #f0f0f0;
+    border-color: #bbb;
+}
+
+.mic-button {
+    margin-left: 10px;
+    font-size: 18px; /* 如果用文字图标 */
+    /* 使用背景图或SVG */
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+}
+
+.icon-button {
+    margin-left: 8px;
+    font-size: 18px; /* 如果用文字图标 */
+    color: #606060;
+}
+.profile-icon {
+    padding: 0; /* 去掉padding让图片撑开 */
+}
+.profile-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+
+/* --- 主体内容区域 Main Container --- */
+.main-container {
+    display: flex;
+    margin-top: 56px; /* 避开固定的 Header */
+    height: calc(100vh - 56px); /* 占据剩余视口高度 */
+}
+
+
+/* --- 左侧侧边栏 Sidebar --- */
+.sidebar {
+    width: 240px; /* 标准宽度 */
+    background-color: #ffffff;
+    padding-top: 10px;
+    overflow-y: auto; /* 内容过多时滚动 */
+    height: 100%; /* 撑满父容器高度 */
+    /* display: none; */ /* 可以通过JS控制显示/隐藏 */
+}
+
+.sidebar nav ul {
+    list-style: none;
+    padding: 0 12px; /* 内边距 */
+}
+
+.sidebar nav li a {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #0f0f0f;
+    margin-bottom: 2px; /* 链接间距 */
+    white-space: nowrap; /* 防止文字换行 */
+    overflow: hidden; /* 隐藏溢出 */
+    text-overflow: ellipsis; /* 显示省略号 */
+}
+.sidebar nav li a:hover {
+    background-color: #eee;
+}
+.sidebar nav li a.active { /* 当前激活链接样式 */
+    background-color: #e5e5e5;
+    font-weight: 500;
+}
+
+.sidebar .channel-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    margin-right: 20px; /* 图标和文字间距 */
+}
+.sidebar .sidebar-section-title {
+    padding: 10px 24px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #606060;
+    text-transform: uppercase;
+}
+
+/* --- 视频内容网格 Content Grid --- */
+.content-grid {
+    flex-grow: 1; /* 占据剩余空间 */
+    padding: 24px;
+    overflow-y: auto; /* 允许内容区滚动 */
+    display: grid;
+    /* 响应式网格布局 */
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px 16px; /* 行间距 列间距 */
+    background-color: #f9f9f9;
+}
+
+/* --- 视频卡片 Video Card --- */
+.video-card {
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+}
+
+.video-thumbnail {
+    width: 100%;
+    aspect-ratio: 16 / 9; /* 保持16:9比例 */
+    background-color: #eee; /* 图像加载前占位 */
+    border-radius: 12px; /* 圆角 */
+    object-fit: cover; /* 裁剪以适应容器 */
+    margin-bottom: 12px;
+}
+
+.video-details {
+    display: flex;
+    align-items: flex-start; /* 头像和文字顶部对齐 */
+}
+
+.channel-avatar-link {
+    margin-right: 12px;
+    flex-shrink: 0; /* 防止头像被压缩 */
+}
+
+.channel-avatar-small {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: #ddd; /* 占位 */
+}
+
+.video-metadata {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    overflow: hidden; /* 防止文字溢出 */
+}
+
+.video-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: #0f0f0f;
+    margin-bottom: 4px;
+    /* 最多显示两行 */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.channel-name,
+.video-stats {
+    font-size: 14px;
+    color: #606060;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.channel-name:hover {
+    color: #0f0f0f;
+}
+
+.video-stats span {
+    margin-right: 4px;
+}
+
+/* --- 响应式调整 (示例：小屏幕时隐藏侧边栏) --- */
+@media (max-width: 768px) {
+    .sidebar {
+        /* display: none; */ /* 或设置为绝对定位，通过JS控制 */
+         width: 72px; /* 仅显示图标的迷你侧边栏 */
+    }
+     .sidebar nav li a {
+        justify-content: center; /* 图标居中 */
+        padding: 15px 0;
+     }
+    .sidebar nav li a span { /* 隐藏文字 */
+        display: none;
+    }
+    .sidebar .channel-avatar { /* 隐藏订阅频道头像 */
+        display: none;
+    }
+     .sidebar .sidebar-section-title {
+         display: none; /* 隐藏标题 */
+     }
+     .sidebar hr {
+         margin: 10px 12px; /* 调整分割线 */
+     }
+
+    .header-center {
+        /* 在非常小的屏幕上可以隐藏搜索框，只留图标 */
+        /* display: none; */
+        flex: unset; /* 取消flex设置 */
+        margin: 0 10px;
+    }
+     .mic-button {
+         display: none; /* 隐藏麦克风 */
+     }
+    .content-grid {
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); /* 调整列最小宽度 */
+        padding: 15px;
+    }
+}
+
+@media (max-width: 480px) {
+     .header-center .search-input {
+         display: none; /* 极小屏幕隐藏输入框 */
+     }
+      .header-center .search-button {
+          border-radius: 50%; /* 按钮变圆 */
+          border: none;
+          background: none;
+          margin-left: 0;
+          padding: 8px;
+      }
+       .header-center .search-button:hover {
+           background-color: #eee;
+       }
+     .header-right .icon-button:not(.profile-icon) {
+         display: none; /* 隐藏部分右侧图标 */
+     }
+     .content-grid {
+        grid-template-columns: 1fr; /* 单列布局 */
+        gap: 15px;
+    }
+}

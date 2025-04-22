@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的YouTube克隆</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- 引入图标库 (可选, 这里用文字代替) -->
+    <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"> -->
+</head>
+<body>
+
+    <!-- 顶部导航栏 -->
+    <header class="header">
+        <div class="header-left">
+            <button class="menu-icon">☰</button> <!-- 菜单按钮 -->
+            <a href="#" class="logo">
+                <img src="https://via.placeholder.com/90x20.png?text=Logo" alt="YouTube Logo"> <!-- 替换为你的Logo -->
+            </a>
+        </div>
+        <div class="header-center">
+            <input type="search" class="search-input" placeholder="搜索">
+            <button class="search-button">
+                <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#5f6368"><path d="M0 0h24v24H0z" fill="none"/><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            </button>
+            <button class="mic-button">🎤</button> <!-- 麦克风按钮 -->
+        </div>
+        <div class="header-right">
+            <button class="icon-button">➕</button> <!-- 创建 -->
+            <button class="icon-button">🔔</button> <!-- 通知 -->
+            <button class="icon-button profile-icon">
+                <img src="https://via.placeholder.com/32" alt="用户头像" class="profile-avatar">
+            </button>
+        </div>
+    </header>
+
+    <!-- 主体内容区域 -->
+    <div class="main-container">
+        <!-- 左侧侧边栏 -->
+        <aside class="sidebar">
+            <nav>
+                <ul>
+                    <li><a href="#" class="active">🏠 首页</a></li>
+                    <li><a href="#">🧭 探索</a></li>
+                    <li><a href="#">📺 Shorts</a></li>
+                    <li><a href="#">🔔 订阅内容</a></li>
+                </ul>
+                <hr>
+                <ul>
+                    <li><a href="#"> C 媒体库</a></li>
+                    <li><a href="#"> H 历史记录</a></li>
+                    <li><a href="#"> ▶️ 您的视频</a></li>
+                    <li><a href="#"> T 稍后观看</a></li>
+                    <li><a href="#"> 👍 顶过的视频</a></li>
+                </ul>
+                 <hr>
+                 <div class="sidebar-section-title">订阅</div>
+                 <ul>
+                     <li><a href="#"><img src="https://via.placeholder.com/24" alt="频道头像" class="channel-avatar"> 频道1</a></li>
+                     <li><a href="#"><img src="https://via.placeholder.com/24" alt="频道头像" class="channel-avatar"> 频道2</a></li>
+                     <li><a href="#"><img src="https://via.placeholder.com/24" alt="频道头像" class="channel-avatar"> 频道3</a></li>
+                 </ul>
+            </nav>
+        </aside>
+
+        <!-- 视频内容网格 -->
+        <main class="content-grid">
+            <!-- 单个视频卡片 -->
+            <div class="video-card">
+                <a href="#">
+                    <img src="https://via.placeholder.com/320x180.png?text=Video+Thumbnail" alt="视频缩略图" class="video-thumbnail">
+                </a>
+                <div class="video-details">
+                    <a href="#" class="channel-avatar-link">
+                        <img src="https://via.placeholder.com/36" alt="频道头像" class="channel-avatar-small">
+                    </a>
+                    <div class="video-metadata">
+                        <a href="#" class="video-title">这是一个非常有趣的视频标题，可能会很长</a>
+                        <a href="#" class="channel-name">频道名称</a>
+                        <div class="video-stats">
+                            <span>100万次观看</span> • <span>1天前</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 重复更多视频卡片... -->
+            <div class="video-card">
+                <a href="#"><img src="https://via.placeholder.com/320x180.png?text=Video+2" alt="视频缩略图" class="video-thumbnail"></a>
+                <div class="video-details">
+                    <a href="#" class="channel-avatar-link"><img src="https://via.placeholder.com/36" alt="频道头像" class="channel-avatar-small"></a>
+                    <div class="video-metadata">
+                        <a href="#" class="video-title">短标题</a>
+                        <a href="#" class="channel-name">另一个频道</a>
+                        <div class="video-stats"><span>5.6万次观看</span> • <span>3小时前</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="video-card">
+                <a href="#"><img src="https://via.placeholder.com/320x180.png?text=Video+3" alt="视频缩略图" class="video-thumbnail"></a>
+                <div class="video-details">
+                    <a href="#" class="channel-avatar-link"><img src="https://via.placeholder.com/36" alt="频道头像" class="channel-avatar-small"></a>
+                    <div class="video-metadata">
+                        <a href="#" class="video-title">学习编程从入门到放弃</a>
+                        <a href="#" class="channel-name">编程大佬</a>
+                        <div class="video-stats"><span>20万次观看</span> • <span>5天前</span></div>
+                    </div>
+                </div>
+            </div>
+             <div class="video-card">
+                <a href="#"><img src="https://via.placeholder.com/320x180.png?text=Video+4" alt="视频缩略图" class="video-thumbnail"></a>
+                <div class="video-details">
+                    <a href="#" class="channel-avatar-link"><img src="https://via.placeholder.com/36" alt="频道头像" class="channel-avatar-small"></a>
+                    <div class="video-metadata">
+                        <a href="#" class="video-title">可爱的猫咪视频合集</a>
+                        <a href="#" class="channel-name">萌宠之家</a>
+                        <div class="video-stats"><span>500万次观看</span> • <span>1周前</span></div>
+                    </div>
+                </div>
+            </div>
+             <div class="video-card">
+                <a href="#"><img src="https://via.placeholder.com/320x180.png?text=Video+5" alt="视频缩略图" class="video-thumbnail"></a>
+                <div class="video-details">
+                    <a href="#" class="channel-avatar-link"><img src="https://via.placeholder.com/36" alt="频道头像" class="channel-avatar-small"></a>
+                    <div class="video-metadata">
+                        <a href="#" class="video-title">旅行Vlog：探索未知之地</a>
+                        <a href="#" class="channel-name">旅行者小明</a>
+                        <div class="video-stats"><span>8.2万次观看</span> • <span>2天前</span></div>
+                    </div>
+                </div>
+            </div>
+             <div class="video-card">
+                <a href="#"><img src="https://via.placeholder.com/320x180.png?text=Video+6" alt="视频缩略图" class="video-thumbnail"></a>
+                <div class="video-details">
+                    <a href="#" class="channel-avatar-link"><img src="https://via.placeholder.com/36" alt="频道头像" class="channel-avatar-small"></a>
+                    <div class="video-metadata">
+                        <a href="#" class="video-title">美食教程：十分钟搞定晚餐</a>
+                        <a href="#" class="channel-name">吃货厨房</a>
+                        <div class="video-stats"><span>12万次观看</span> • <span>6小时前</span></div>
+                    </div>
+                </div>
+            </div>
+            <!-- ... 更多视频卡片 ... -->
+
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
