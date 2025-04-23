@@ -674,7 +674,7 @@ r远远小于M,N，因此降低了参数量
 ![image-20250318103544107](../my_minimind/images/image-20250318103544107.png)
 
 $$
-h=W_0x+\bigtriangleup W_x=W_0x+BAx
+h=W_0x+\bigtriangleup W_x=W_0x+BAx
 $$
 
 ```
@@ -1948,6 +1948,8 @@ RL/GRPO
 
 # AI agent
 
+![image-20250423161539410](pic/image-20250423161539410.png)
+
 ```
 三个阶段：
 reasoning/planing
@@ -1977,6 +1979,14 @@ reflextion（类似memory)
 ```
 
 ![](D:/RL-study/pic/image-20250417203035968.png)
+
+## 最重要的能力-ToolCall
+
+也叫function call
+
+![image-20250423162128045](pic/image-20250423162128045.png)
+
+
 
 ## MCP
 
