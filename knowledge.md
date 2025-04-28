@@ -1,4 +1,3 @@
-```
 Python 3.10.16
 pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu121
 
@@ -7,18 +6,17 @@ conda activate mind
 channels:
   - defaults
 custom_channels:
-  conda-forge: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
-  msys2: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
-  bioconda: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
-  menpo: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
-  pytorch: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
-  simpleitk: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+    conda-forge: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+    msys2: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+    bioconda: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+    menpo: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+    pytorch: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+    simpleitk: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
 default_channels:
   - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main
   - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/r
   - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/msys2
 show_channel_urls: True
-```
 
 # **项目包含**
 
@@ -416,6 +414,29 @@ minimind的整体结构一致，只是在RoPE计算、推理函数和FFN层的�
 
 # 知识点
 
+## 项目
+
+### **命令行参数argparse**
+
+```
+import argparse
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser(description='minimind argument')
+    parser.add_argument('--model',type=int,default=0)
+    parser.add_argument('--dtype',type=str,default='bfloat16')	
+    
+    # 运行脚本时加上 --use_wandb，argparse 会将与该参数对应的变量值设置为 True。
+	# 默认值为 False: 如果你在命令行中没有包含这个参数，argparse 会将与该参数对应的变量值默认为 False
+	parser.add_argument("--use_wandb", action="store_true")
+	
+	
+    args=parser.parse_args()
+    print(args.model)
+```
+
+
+
 ## LLaVA 架构详细解释
 
 LLaVA 的核心思想是将一个强大的预训练语言模型与一个预训练的视觉编码器相结合，并通过一个连接模块（投影层）来实现跨模态的对齐。其主要组成部分包括：
@@ -657,6 +678,8 @@ chatglm中为了高效地实现 RoPE，把向量在内存中重新排列成前�
 
 ## LoRA（Low-Rank Adaptation of Large Language Models）
 
+### lora
+
 peft (Parameter-Efficient Fine-Tuning)
 
  从2019年的Adapter, 到2021年的Prefix-tuning，在到现在2023最常用的微调方法LoRA。
@@ -683,6 +706,200 @@ $$
 B确保了微调从预训练模型的状态开始，避免了初始的干扰，同时也为低秩矩阵在训练过程中学习有效的任务特定适应提供了基础。
 使用随机高斯分布初始化矩阵 A，则为低秩更新 (BA) 在训练过程中学习有意义的变化提供了必要的多样性和非零值
 ```
+
+### Qlora
+
+QLoRA 是一种高效的大型语言模型 (LLM) 微调技术，它建立在 LoRA (Low-Rank Adaptation) 的基础之上，并通过引入量化进一步降低了内存消耗。
+
+QLoRA 的核心思想是：
+
+1. **将预训练的基础模型量化到低精度**（通常是 4 位，如 4-bit NormalFloat），以极大减少模型的内存占用。
+2. **引入低秩适配器 (LoRA Adapters)**，这些适配器是一些小的、可训练的矩阵，注入到基础模型的特定层（主要是线性层）中。
+3. **仅训练这些 LoRA 适配器**，而基础模型的量化权重在微调过程中保持冻结不变。
+4. **在更高精度下进行 LoRA 适配器的计算和优化**（通常是 FP16 或 bfloat16），以保持训练的数值稳定性。
+
+**它是如何工作的？**
+
+QLoRA 的工作原理可以分解为以下几个关键部分：
+
+1. **基础模型的 4 位量化**: 这是 QLoRA 节省内存的主要手段。预训练好的 LLM 的权重被量化到 4 位精度。QLoRA 提出了一种名为 **NormalFloat (NF4)** 的 4 位数据类型，它针对权重通常遵循正态分布的特点进行了优化，能在 4 位下更有效地表示权重值。量化后的权重存储在显存中。
+2. **LoRA 适配器**: 与原始 LoRA 一样，QLoRA 在基础模型的每个被选中的线性层 W0 中，加入两个小的矩阵 A 和 B。原始的权重更新 ΔW 被约束为 BA，其中 B∈Rd×r，A∈Rr×k，r 是远小于 d 和 k 的秩。在 QLoRA 中，这些矩阵 A 和 B **不被量化**，它们以更高精度（如 FP16 或 bfloat16）进行训练。
+3. **前向传播**: 在前向传播时，输入数据与基础模型的量化权重矩阵相乘 (QW0×x)，同时与 LoRA 适配器矩阵相乘 ((BA)×x)。为了执行计算，量化权重 QW0 需要在计算时动态地反量化回更高精度（例如 FP16）。然后，反量化后的基础权重结果与 LoRA 适配器的计算结果相加。整个计算流程大致是：输入 -> 反量化 QW0 到 FP16 -> 计算 FP16 的 W0×x -> 计算 FP16 的 (BA)×x -> 将两个结果相加 -> 输出（可能再被量化）。
+4. **反向传播**: 梯度只相对于 LoRA 适配器矩阵 A 和 B 计算。由于基础模型的权重是冻结的，它们不需要计算梯度，这大大减少了计算量和显存需求。
+5. **优化器**: 优化器仅更新 LoRA 适配器矩阵 A 和 B 的参数。这些参数数量远少于基础模型的参数数量。
+
+**QLoRA 的创新点:**
+
+除了结合量化和 LoRA，QLoRA 论文还提出了几个关键的技术来确保在低显存下的训练可行性和精度：
+
+- **4-bit NormalFloat (NF4)**: 一种新的信息理论上最优的 4 位量化数据类型，尤其适合正态分布的权重。
+- **双量化 (Double Quantization, DQ)**: 对量化常数（如 scale 和 zero_point）本身也进行量化。虽然节省的内存不多，但它进一步减少了量化相关的额外内存开销。
+- **分页优化器 (Paged Optimizers)**: 利用 NVIDIA Unified Memory 的特性，将优化器的状态（如 Adam 的动量和方差）分页到 CPU 内存，只在需要时加载到 GPU，避免了优化器状态占用过多 GPU 显存导致 OOM (Out of Memory)。
+- **梯度检查点 (Gradient Checkpointing)**: 一种标准的内存优化技术，通过在反向传播时重新计算一部分前向传播的结果来节省显存，QLoRA 更积极地使用了它。
+
+**为什么 QLoRA 能高效微调大模型？**
+
+- **极低的显存占用**: 基础模型量化到 4 位是内存效率的关键。
+- **参数高效**: 仅训练 LoRA 适配器，训练参数量极少。
+- **计算高效**: 利用了高度优化的 4 位计算核（如 `bitsandbytes` 提供的 CUDA Kernel）。
+- **精度保持**: NF4 量化、双量化和在更高精度下训练 LoRA 适配器有助于在大幅降低内存的同时保持可接受的精度。
+
+### 代码
+
+实现 QLoRA 微调通常需要结合使用以下库：
+
+- `transformers`: 用于加载预训练模型和分词器，以及提供 `Trainer` API 进行训练。
+- `peft` (Parameter-Efficient Fine-tuning): 提供了 LoRA 等参数高效微调技术的实现，能够轻松地将 LoRA 适配器注入到基础模型中。
+- `bitsandbytes`: 提供了高效的 8 位和 4 位量化功能，以及相应的优化器和 CUDA Kernel。
+
+```python
+# 首先确保安装必要的库
+# pip install transformers peft bitsandbytes accelerate datasets
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments, Trainer
+from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+from datasets import load_dataset
+
+# --- 配置 ---
+# 选择你要微调的模型，这里以一个较小的模型为例，大模型原理相同
+model_name = "facebook/opt-125m" # 替换为你需要微调的模型名称，如 "meta-llama/Llama-2-7b-hf"
+dataset_name = "Abirate/english_quotes" # 示例数据集
+output_dir = "./qlora-finetuning-demo"
+lora_r = 16         # LoRA 的秩
+lora_alpha = 32     # LoRA 的缩放因子
+lora_dropout = 0.05 # LoRA 层的 dropout
+# 通常需要根据模型结构确定 target_modules，这里是 OPT 模型的线性层名称
+# 对于 Llama 模型，通常是 ['q_proj', 'k_proj', 'v_proj', 'o_proj'] 等
+target_modules = ["q_proj", "v_proj"]
+
+# --- 1. 加载分词器 ---
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+# 设置 padding token，许多模型没有默认的 padding token，需要手动设置
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
+# --- 2. 加载基础模型并进行 4 位量化 ---
+# load_in_4bit=True 告诉 transformers 使用 bitsandbytes 加载 4 位量化模型
+# bnb_4bit_compute_dtype 指定计算时的数据类型 (通常与 FP16 或 BF16 配合)
+# bnb_4bit_quant_type 指定 4 位量化类型，nf4 是 bitsandbytes 提出的 NormalFloat 4bit
+# device_map='auto' 自动将模型加载到可用的设备 (GPU)
+model = AutoModelForCausalLM.from_pretrained(
+    model_name,
+    load_in_4bit=True,
+    bnb_4bit_compute_dtype=torch.bfloat16, # 如果 GPU 支持 BF16，优先使用；否则用 torch.float16
+    bnb_4bit_quant_type="nf4",
+    device_map="auto"
+)
+
+# 3. 准备模型进行 k-bit (这里是 4-bit) 训练
+# prepare_model_for_kbit_training 函数会进行一些处理，例如启用梯度检查点、处理 LayerNorm 等
+model = prepare_model_for_kbit_training(model)
+
+# --- 4. 配置 LoRA ---
+lora_config = LoraConfig(
+    r=lora_r,
+    lora_alpha=lora_alpha,
+    lora_dropout=lora_dropout,
+    bias="none", # 通常对 bias 不使用 LoRA
+    task_type="CAUSAL_LM", # 任务类型是因果语言模型
+    target_modules=target_modules # 指定将 LoRA 注入到哪些层
+)
+
+# --- 5. 将 LoRA 适配器注入到模型中 ---
+# get_peft_model 会用 LoRA 适配器包装基础模型，并标记 LoRA 参数为可训练
+model = get_peft_model(model, lora_config)
+
+# 打印模型的可训练参数量，你会发现相对于总参数量非常少
+model.print_trainable_parameters()
+
+# --- 6. 准备数据集 ---
+dataset = load_dataset(dataset_name, split="train")
+
+# 数据预处理函数
+def preprocess_function(examples):
+    # 将文本和结束符拼接，作为语言模型的输入
+    # 这里简单拼接所有 quotes，实际应用中需要更精细的样本处理
+    text = [q + tokenizer.eos_token for q in examples["quote"]]
+    # 对文本进行分词和编码
+    tokenized_examples = tokenizer(
+        text,
+        max_length=256, # 设置最大序列长度
+        padding="max_length",
+        truncation=True,
+        return_attention_mask=False # 对于 causal LM 通常不需要 attention mask
+    )
+    # 语言模型的标签是输入的下一个 token，所以直接复制 input_ids
+    tokenized_examples["labels"] = tokenized_examples["input_ids"].copy()
+    return tokenized_examples
+
+# 应用预处理
+dataset = dataset.map(preprocess_function, batched=True, remove_columns=["quote", "author"])
+
+# --- 7. 设置训练参数 ---
+training_args = TrainingArguments(
+    output_dir=output_dir,
+    per_device_train_batch_size=4, # 根据你的显存调整 batch size
+    gradient_accumulation_steps=4, # 梯度累积步数，模拟更大的 batch size (4 * 4 = 16)
+    learning_rate=2e-4,
+    num_train_epochs=1, # 训练 epoch 数
+    logging_steps=10, # 每多少步记录一次日志
+    save_steps=100, # 每多少步保存一次检查点 (LoRA 适配器)
+    fp16=False,      # 如果你的 GPU 不支持 BF16，并且 bnb_4bit_compute_dtype 设置为 FP16，则这里设为 True
+    bf16=True,       # 如果你的 GPU 支持 BF16 (如 Ampere 或更新架构)，并且 bnb_4bit_compute_dtype 设置为 BF16，则这里设为 True
+    gradient_checkpointing=True, # 启用梯度检查点，进一步节省显存（会增加计算时间）
+    # optim="paged_adamw_8bit", # QLoRA 论文中使用了分页优化器，这里可以选择
+    report_to="none" # 不向任何地方报告日志
+)
+
+# --- 8. 创建 Trainer 并开始训练 ---
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=dataset,
+    tokenizer=tokenizer, # Trainer 也需要 tokenizer
+    # data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False) # 如果需要特殊的 collator
+)
+
+print("开始训练...")
+trainer.train()
+print("训练完成.")
+
+# --- 9. 保存 LoRA 适配器 ---
+# 训练完成后，保存的只有 LoRA 适配器的权重，而不是整个模型
+trainer.model.save_pretrained(output_dir)
+print(f"LoRA 适配器已保存到 {output_dir}")
+
+# --- 推理示例 (加载基础模型和 LoRA 适配器) ---
+print("\n加载 LoRA 适配器进行推理...")
+# 首先加载原始的 4 位量化基础模型
+base_model = AutoModelForCausalLM.from_pretrained(
+    model_name,
+    load_in_4bit=True,
+    bnb_4bit_compute_dtype=torch.bfloat16,
+    bnb_4bit_quant_type="nf4",
+    device_map="auto"
+)
+
+# 然后加载保存的 LoRA 适配器到基础模型上
+from peft import PeftModel
+model_for_inference = PeftModel.from_pretrained(base_model, output_dir)
+
+# 将模型切换到评估模式
+model_for_inference.eval()
+
+# 进行推理
+prompt = "The meaning of life is"
+inputs = tokenizer(prompt, return_tensors="pt").to(model_for_inference.device)
+
+with torch.no_grad():
+    outputs = model_for_inference.generate(**inputs, max_new_tokens=50, num_return_sequences=1)
+
+print("\n加载适配器后的模型推理结果:")
+print(tokenizer.decode(outputs[0], skip_special_tokens=True))
+```
+
+
 
 ## ViT
 
@@ -723,6 +940,60 @@ labels代表正样本，因为对角线都是正样本
 
 ## 混合精度scaler
 
+### 主要阶段
+
+混合精度训练（通常指结合使用 FP32 和 FP16）的核心思想是在计算过程中智能地切换数据类型，以利用 FP16 的高速和低显存优势，同时保留 FP32 的高精度和数值稳定性，特别是在对数值范围敏感的环节。
+
+这里以前向传播、损失计算、反向传播和权重更新这几个主要阶段来描述精度的变化：
+
+**1. 前向传播 (Forward Pass)**
+
+- **输入数据**: 通常，输入数据最初是以 FP32 精度加载的。
+- **模型层内部计算**: 在使用支持混合精度的框架（如 PyTorch 的 `autocast`）时，前向传播过程中大部分计算（如矩阵乘法、卷积等）会在 **FP16** 精度下执行。
+
+- **部分保持 FP32 的计算**: 并不是所有的操作都适合用 FP16 进行。一些对数值范围或精度要求较高的操作（例如 Softmax、Layer Normalization、归约操作 Reduce Sum/Mean 等）可能会被框架自动保持在 **FP32** 精度进行计算，即使它们位于 `autocast` 区域内。这是为了确保数值稳定性，防止溢出或精度损失过大。
+- **中间结果**: 在前向传播过程中产生的中间张量会根据执行的操作类型，以 FP16 或 FP32 的精度存储。
+- **模型输出**: 模型最终的输出通常会被转换回 **FP32** 精度，以便进行后续的损失计算，因为损失函数对输入精度通常比较敏感。
+
+**总结前向传播：** 输入 FP32 -> 大部分核心计算在 FP16 (有自动类型转换) -> 部分稳定敏感操作在 FP32 -> 中间结果 FP16/FP32 混杂 -> 模型输出 FP32。
+
+**2. 损失计算 (Loss Calculation)**
+
+- 损失函数通常接收 FP32 格式的模型输出和标签。
+- 损失值本身通常在 **FP32** 精度下计算和存储。这是为了保持损失值的精度，尤其是当损失值很小时，FP32 能提供更大的动态范围，避免下溢。
+
+**总结损失计算：** 使用 FP32 模型输出和 FP32 标签 -> 计算得到 FP32 的损失值。
+
+**3. 反向传播 (Backward Pass)**
+
+- **梯度缩放 (Gradient Scaling)**: 在反向传播开始之前，混合精度训练会引入梯度缩放。FP32 的损失值会乘以一个较大的**标量缩放因子**（通常用 `GradScaler` 管理）。
+- **计算缩放后的梯度**: 反向传播从这个**缩放后的损失**开始计算梯度。根据链式法则，计算得到的每个梯度都会被这个缩放因子放大。
+- **梯度计算精度**: 大部分梯度的计算会沿用前向传播时的精度，即在 **FP16** 精度下进行计算，因为梯度也被放大了，不容易发生下溢。
+- **梯度累积 (如果使用)**: 如果使用了梯度累积，累积的梯度通常会在 **FP32** 精度下进行累加，以保证累加过程的精度。
+- **反缩放 (Unscaling)**: 在将梯度用于更新模型权重之前，累积的、**缩放后的梯度**需要被除以相同的缩放因子，以恢复其原始的数值范围。这一步通常在 **FP32** 精度下进行，得到**未缩放的梯度**。
+
+**总结反向传播：** FP32 损失 -> FP32 损失乘以缩放因子 -> 反向计算得到**缩放后**的梯度（主要在 FP16 计算）-> 累积梯度（通常在 FP32）-> **反缩放**得到**未缩放的梯度**（在 FP32）
+
+**4. 权重更新 (Weight Update)**
+
+- 为了保持模型的长期稳定性和精度，模型的主权重通常会以 **FP32** 精度存储和维护。
+- 优化器会使用**未缩放的 FP32 梯度**（可能经过梯度裁剪）来更新这些 **FP32 主权重**。权重的更新计算（例如 SGD 的 `weight = weight - learning_rate * gradient`）也在 FP32 精度下执行。
+- 在更新完 FP32 主权重后，通常会将这些更新后的 FP32 权重复制并转换为 **FP16** 格式，用于下一轮前向传播时的快速计算（即所谓的 FP16 工作权重）。
+
+**总结权重更新：** 使用 FP32 梯度更新 FP32 主权重 -> 将更新后的 FP32 权重转换为 FP16 工作权重用于下一轮前向。
+
+
+
+**总的来说，混合精度训练中的精度变化是一个动态和混合的过程：**
+
+- 核心计算（前向和反向传播中的大部分）利用 **FP16** 加速。
+- 数值敏感的操作和损失计算保持 **FP32** 稳定性。
+- 通过**梯度缩放**，放大 FP16 的梯度，防止下溢。
+- **FP32 主权重**用于保持模型的精确状态，并在更新时使用 **FP32 梯度**。
+- **FP16 工作权重**用于前向传播时的 FP16 计算。
+
+### 图解
+
 ![image-20250319192044309](../my_minimind/images/image-20250319192044309.png)
 
 loss计算时，梯度一般很小，超过FP16的范围，因此采用scale缩放
@@ -732,6 +1003,161 @@ loss计算时，梯度一般很小，超过FP16的范围，因此采用scale缩�
 scaler.update()更新scale比例
 
 ![image-20250319191755309](../my_minimind/images/image-20250319191755309.png)
+
+### 原理和代码
+
+```
+为什么需要梯度缩放和这个“scalar”？
+
+使用 FP16 进行计算可以带来显著的性能提升，但 FP16 的数值表示范围比 FP32 小。在深度学习训练的反向传播过程中，计算得到的梯度值可能会非常小。如果直接使用 FP16 来存储和处理这些小梯度的值，它们可能会因为数值太小而变成零（即发生 下溢 (underflow)），导致模型无法正确地更新权重，从而影响模型的收敛和最终的精度。
+
+为了解决这个问题，梯度缩放被引入。它的核心思想是在反向传播计算梯度之前，先将损失 (loss) 乘以一个较大的缩放因子（一个标量）。根据链式法则，乘以损失的缩放因子会自动将所有的梯度也按相同的比例放大。这样，原来非常小的梯度值在放大后就落在了 FP16 可以有效表示的范围内，避免了下溢。
+
+在优化器更新模型权重时，再将这些放大后的梯度除以相同的缩放因子，恢复其原始大小，用于更新 FP32 精度的模型权重副本（为了保持权重的精确性，通常会维护一份 FP32 的主权重）。
+
+所以，“混合精度 scalar”实际上是指用于梯度缩放的那个标量缩放因子。
+```
+
+现代深度学习框架提供了自动混合精度 (Automatic Mixed Precision, AMP) 的功能，极大地简化了在代码中使用混合精度和梯度缩放的过程。在 PyTorch 中，主要使用 `torch.cuda.amp.autocast` 和 `torch.cuda.amp.GradScaler`
+
+```python
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.cuda.amp import autocast, GradScaler
+
+# 1. 定义模型、损失函数和优化器
+model = nn.Linear(10, 1).cuda() # 将模型放到支持FP16计算的设备上，如GPU
+criterion = nn.MSELoss()
+optimizer = optim.SGD(model.parameters(), lr=0.01)
+
+# 2. 创建 GradScaler 实例
+# GradScaler 负责管理缩放因子，并在反向传播和优化器步骤中应用缩放和反缩放
+scaler = GradScaler()
+
+# 假设有一些输入数据和标签
+input_data = torch.randn(64, 10).cuda()
+labels = torch.randn(64, 1).cuda()
+
+# 训练循环
+for epoch in range(num_epochs):
+    optimizer.zero_grad()
+
+    # 3. 在需要使用混合精度的前向传播部分使用 autocast 上下文管理器
+    # 在 autocast 区域内，PyTorch会自动选择合适的精度（FP16或FP32）进行计算
+    with autocast():
+        outputs = model(input_data)
+        loss = criterion(outputs, labels)
+
+    # 4. 使用 scaler.scale() 来缩放损失
+    # 这一步会将损失值乘以当前的缩放因子
+    scaler.scale(loss).backward()
+
+    # 5. 使用 scaler.step() 来更新优化器参数
+    # 在调用 optimizer.step() 之前，scaler 会先检查梯度是否包含 inf 或 NaN（溢出或无效值）
+    # 如果没有，scaler 会将缩放后的梯度反缩放回原始大小，然后调用 optimizer.step() 进行参数更新
+    # 如果有 inf 或 NaN，scaler 会跳过当前的 optimizer.step()，并调整缩放因子以尝试避免未来的溢出
+    scaler.step(optimizer)
+
+    # 6. 使用 scaler.update() 来更新缩放因子
+    # scaler 会根据之前的梯度检查结果来动态调整缩放因子，以便在下一次迭代中使用
+    scaler.update()
+
+    print(f'Epoch {epoch+1}, Loss: {loss.item()}')
+```
+
+### minimind的scalar
+
+```python
+with ctx:  # 使用自动混合精度（如果启用）
+    res = model(X)  # 前向传播
+    loss = loss_fct(
+        res.logits.view(-1, res.logits.size(-1)),
+        Y.view(-1)
+    ).view(Y.size())
+    loss = (loss * loss_mask).sum() / loss_mask.sum()  # 计算掩码损失
+    loss += res.aux_loss  # 添加辅助损失（如果有）
+    loss = loss / args.accumulation_steps  # 梯度累积
+
+scaler.scale(loss).backward()  # 反向传播（带梯度缩放）
+
+# 梯度累积完成后更新模型参数
+if (step + 1) % args.accumulation_steps == 0:
+    scaler.unscale_(optimizer) # 反缩放
+    torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)  # 梯度裁剪通常应该应用于未缩放的梯度
+    scaler.step(optimizer)  # 更新参数；由于前面对梯度进行了操作，所以不再对梯度反缩放
+    scaler.update()  # 更新梯度缩放器
+    optimizer.zero_grad(set_to_none=True)  # 清空梯度
+
+    
+# 当你需要在调用 scaler.step(optimizer) 之前对梯度进行操作（例如梯度裁剪、手动修改梯度等），并且这些操作要求梯度是未缩放的，你就需要显式地调用 scaler.unscale_(optimizer) 来提前完成反缩放。
+# 当你计算完缩放后的梯度后，没有任何需要未缩放梯度的中间操作，直接进行优化器步进，那么 scaler.step(optimizer) 会负责在内部完成反缩放和更新参数的整个流程。
+```
+
+这段代码片段展示了在深度学习训练中同时使用了**混合精度训练 (Mixed Precision Training)**、**梯度缩放 (Gradient Scaling)**、**梯度累积 (Gradient Accumulation)** 和**梯度裁剪 (Gradient Clipping)**。
+
+在 `accumulation_steps` 步后才更新参数的原因主要在于**梯度累积**。
+
+这里解释一下各个部分的协同工作：
+
+1. **梯度累积 (`accumulation_steps`)**:
+
+   - 梯度累积是一种在不增加硬件显存占用的情况下，模拟更大 batch size 训练的技术。
+   - 它通过在多个小的 forward/backward 步骤中累积梯度，而不是在每一步都更新模型权重。
+   - 累积 `accumulation_steps` 步的梯度，相当于使用了 `batch_size * accumulation_steps` 的有效 batch size。
+
+2. **混合精度与梯度缩放 (`scaler.scale(loss).backward()`, `GradScaler`)**:
+
+   - 如前所述，混合精度训练使用 FP16 计算加速，但可能导致小梯度下溢。
+   - `GradScaler` 和 `scaler.scale(loss)` 是为了解决 FP16 下溢问题而引入的梯度缩放机制。它将损失放大，从而放大梯度，使其在 FP16 的范围内。
+   - `scaler.scale(loss).backward()` 计算的是**缩放后的梯度**。这些缩放后的梯度会在每个小步骤中累积起来。
+
+3. **参数更新 (`scaler.step(optimizer)`)**:
+
+   - 优化器的 `step()` 方法是根据当前累积的梯度来更新模型权重的关键步骤。
+
+   - 在使用 `GradScaler` 时，需要调用 `scaler.step(optimizer)` 来代替标准的 `optimizer.step()`。
+
+   - ```
+     scaler.step(optimizer)
+     ```
+
+      在内部会执行几个重要操作：
+
+     - **反缩放 (Unscaling)**: 在更新权重之前，`scaler` 会检查累积的梯度是否有 `inf` 或 `NaN` 值。如果没有，它会将累积的**缩放后的梯度**除以当前的缩放因子，得到**原始尺度的梯度**。
+     - **应用梯度**: 使用反缩放后的梯度来更新模型的 FP32 主权重。
+     - **处理溢出**: 如果检测到 `inf` 或 `NaN`，说明当前的缩放因子可能太高导致溢出，`scaler.step` 会跳过这次权重更新，并通知 `scaler.update()` 调整缩放因子。
+
+4. **更新梯度缩放器 (`scaler.update()`)**:
+
+   - `scaler.update()` 会根据前一步 `scaler.step()` 的结果来调整缩放因子。如果之前没有溢出，缩放因子可能会增大；如果发生了溢出，缩放因子会减小。这是为了动态地找到一个合适的缩放因子。
+
+5. **梯度裁剪 (`torch.nn.utils.clip_grad_norm_`)**:
+
+   - 梯度裁剪用于限制梯度的最大范数，防止梯度爆炸。
+   - **重要的一点是，梯度裁剪通常应该应用于未缩放的梯度。**
+
+**为什么在 `accumulation_steps` 后更新参数？**
+
+结合以上几点，原因就很清楚了：
+
+- **`scaler.step(optimizer)` 需要操作的是累积完成的总梯度。** 它负责对累积了多个小批量梯度的结果进行反缩放和应用到权重上。如果在每个小步骤都调用 `scaler.step`，那么每次都只用到了一个小批量的梯度，这违背了梯度累积的初衷，也无法正确地进行缩放和反缩放。
+- **`scaler.update()` 的缩放因子调整是基于累积了一定步数（即一个有效 batch size）后的梯度情况。** 在每个小步骤后更新缩放因子是不准确的。
+- **梯度裁剪 (`clip_grad_norm_`) 必须在 `scaler.unscale_(optimizer)` 之后进行。** 因为梯度裁剪的阈值是针对未缩放的梯度设定的。在累积 `accumulation_steps` 步后，我们首先通过 `scaler.unscale_(optimizer)` 获取未缩放的累积梯度，然后进行裁剪，最后再由 `scaler.step(optimizer)` 应用这些裁剪后的、已经处理了缩放问题的梯度。
+
+**代码中的流程总结：**
+
+在代码中，`scaler.scale(loss).backward()` 在每个小步都会执行，计算并累加缩放后的梯度。
+
+每当累积满 `args.accumulation_steps` 步后，执行一次完整的优化步骤：
+
+1. `scaler.unscale_(optimizer)`: 将当前累积的缩放后的梯度反缩放回原始大小。**这一步是进行梯度裁剪前必须的。**
+2. `torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)`: 对反缩放后的累积梯度进行裁剪。
+3. `scaler.step(optimizer)`: 使用裁剪后的梯度更新模型参数，并内部处理 FP16 溢出检测。
+4. `scaler.update()`: 根据 `scaler.step` 的结果调整缩放因子。
+5. `optimizer.zero_grad(set_to_none=True)`: 清空累积的梯度，为下一轮梯度累积做准备。
+
+因此，将参数更新放在 `accumulation_steps` 后是为了确保优化器操作的是经过完整累积、正确缩放和处理后的梯度，从而实现模拟大 batch size 训练、利用混合精度加速并保持训练稳定。
 
 ## 显存占用（混合精度，FP16和FP32）
 
@@ -797,17 +1223,19 @@ https://www.bilibili.com/video/BV1NZ421s75D/?spm_id_from=333.1387.upload.video_c
 
 浮点数转为整数型计算
 
-### 量化和反量化：对称量化和非对称量化
+### 图解
+
+#### 量化和反量化：对称量化和非对称量化
 
 ![image-20250319201402966](../my_minimind/images/image-20250319201402966.png)
 
 ![image-20250319201722534](../my_minimind/images/image-20250319201722534.png)
 
-### 神经网络量化
+#### 神经网络量化
 
 ![image-20250319202219301](../my_minimind/images/image-20250319202219301.png)
 
-### 动态量化
+#### 动态量化
 
 量化参数：zero_point，scale
 
@@ -815,17 +1243,17 @@ https://www.bilibili.com/video/BV1NZ421s75D/?spm_id_from=333.1387.upload.video_c
 
 ![image-20250319204420378](../my_minimind/images/image-20250319204420378.png)
 
-### 静态量化
+#### 静态量化
 
 每层输出int8，利用代表性数据得到每层的量化参数，以后每层就固定使用这些参数；**有误差**
 
 ![image-20250319204400829](../my_minimind/images/image-20250319204400829.png)
 
-### 量化感知训练
+#### 量化感知训练
 
 ![image-20250319205245822](../my_minimind/images/image-20250319205245822.png)
 
-### LLM.int8
+#### LLM.int8
 
 ![image-20250319210306174](../my_minimind/images/image-20250319210306174.png)
 
@@ -835,7 +1263,7 @@ bnb_config=BitsAndBytesConfig(load_in_8bit=True)
 model=AutoModelForCausalLM.from_pretrained(model_id,device_map='auto',quantization_config=bnb_config)
 ```
 
-### QLoRA 4bit 量化 NormalFloat4 量化
+#### QLoRA 4bit 量化 NormalFloat4 量化
 
 4bit总共有16类
 
@@ -855,29 +1283,350 @@ model=AutoModelForCausalLM.from_pretrained(model_id,device_map='auto',quantizati
 
 ![image-20250319211429968](../my_minimind/images/image-20250319211429968.png)
 
+### 原理
+
+量化是指将模型的权重（Weights）和/或激活值（Activations）从高精度浮点格式（如 FP32，32位浮点数；或 FP16，16位半精度浮点数）转换为低精度定点或整数格式（如 INT8，8位整数；INT4，4位整数；甚至更低）。
+
+**减小模型体积**
+
+**加速推理**
+
+**降低能耗**
+
+**量化的核心思想:**
+
+量化的基本思想是将一个范围内的浮点数值，映射到另一个范围内的整数数值。这个映射关系通常通过**缩放因子 (scale)** 和**零点 (zero_point)** 来定义。
+
+最常见的量化方法是**仿射量化 (Affine Quantization)**，其公式为：
+
+​														Q=round(R/scale)+zero_point
+
+其中：
+
+- R: 原始的浮点数 (Real value)。
+- Q: 量化后的整数 (Quantized value)。
+- scale: 缩放因子，决定了浮点范围如何映射到整数范围。
+- zero_point: 零点，一个整数偏移，确保浮点数 0.0 能够精确地映射到一个整数值，这对于保留激活值中的零非常重要（零激活在神经网络中很常见）。
+- round(): 取整函数，将结果转换为整数。
+
+![image-20250423232815868](pic/image-20250423232815868.png)
+
+**量化的类型（按何时进行）：**
+
+1. **训练后量化 (Post-Training Quantization, PTQ)**: 在模型训练完成后进行。相对简单快速，不需要重新训练。通常需要少量校准数据来确定 scale 和 zero_point。可能会有一定的精度损失。
+2. **量化感知训练 (Quantization-Aware Training, QAT)**: 在训练过程中模拟量化的影响。在模型中插入模拟量化和反量化的节点，让模型在训练时就适应量化带来的数值误差。通常能获得比 PTQ 更好的精度，但需要修改训练流程。
+
+大模型中 PTQ 更常用，因为它不需要巨大的计算资源重新训练，且配合一些先进的 PTQ 技术（如 AWQ, GPTQ）也能达到很好的效果。
+
+**大模型中的反量化 (Dequantization)**
+
+反量化是将量化后的低精度整数值，转换回原始的高精度浮点格式的过程
+
+### 代码
+
+**使用针对大模型的量化库 (如 `bitsandbytes`)**
+
+对于 LLMs，由于其规模和特性（如大量的线性层），常常使用专门的量化库。`bitsandbytes` 是一个非常流行的库，提供了 8 位和 4 位量化功能，并且优化了相应的 CUDA Kernel 以加速计算。
+
+```python
+# 需要先安装 bitsandbytes 和 accelerate
+# pip install bitsandbytes accelerate transformers
+
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
+
+# 模型名称 (例如 Llama-2-7b)
+model_name = "meta-llama/Llama-2-7b-hf" # 替换为你想加载的模型
+
+# 以 8 位精度加载模型
+# load_in_8bit=True 会使用 bitsandbytes 进行 8 位量化加载
+# device_map='auto' 会自动将模型加载到可用的设备上 (如 GPU)
+model = AutoModelForCausalLM.from_pretrained(
+    model_name,
+    load_in_8bit=True, # 核心参数：启用 8 位加载
+    device_map='auto',
+    torch_dtype=torch.float16 # 通常与 FP16 或 BF16 配合使用
+)
+
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+print(f"模型加载完成，使用了 8 位量化: {model_name}")
+print("模型参数类型示例:", model.lm_head.weight.dtype) # 可能会显示 BitsAndBytes 8-bit 类型
+
+# 现在可以直接使用 model 进行推理，计算会在 8 位进行 (通过 bitsandbytes 的 kernel)
+# 输入和输出处理通常仍然涉及 FP16/FP32 的转换，由 bitsandbytes 在底层处理反量化和量化
+
+# 示例推理
+prompt = "请写一个关于人工智能的短故事："
+inputs = tokenizer(prompt, return_tensors="pt").to(model.device) # 将输入放到模型所在的设备上
+
+with torch.no_grad():
+    outputs = model.generate(**inputs, max_new_tokens=100)
+
+response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+print("\n模型生成结果:")
+print(response)
+
+# 使用 4 位量化类似，只需将 load_in_8bit=True 改为 load_in_4bit=True
+# model_4bit = AutoModelForCausalLM.from_pretrained(
+#     model_name,
+#     load_in_4bit=True, # 启用 4 位加载
+#     device_map='auto',
+#     torch_dtype=torch.float16
+# )
+```
+
+这里的量化和反量化细节主要由 `bitsandbytes` 库在底层处理，包括权重的加载、存储和计算时的动态反量化（或直接使用量化 Kernel）。
+
 ## 大模型分布式DP
 
-### DP:data parallel
+### 原理
 
-单进程，多线程，只能利用一个cpu
+**为什么需要大模型分布式？**
 
+主要原因有三个：
+
+1. **内存限制 (Memory Limit):**
+   - **模型参数 (Model Parameters):** 大模型的参数量巨大，即使使用较低精度（如 FP16），其存储所需的内存也可能超过单个 GPU 的显存。
+   - **梯度 (Gradients):** 训练时需要存储与参数量相同的梯度。
+   - **优化器状态 (Optimizer States):** Adam 等优化器需要存储额外的状态（如动量、方差），通常是参数量的 2-4 倍。
+   - **中间激活值 (Intermediate Activations):** 前向计算时产生的中间结果，反向传播时需要用到，也非常占用内存。
+   - **数据批次 (Batch Data):** 输入数据本身也需要占用显存。 当这些总和超过单个设备的最大内存时，就必须进行分布式处理。
+2. **计算限制 (Compute Limit):**
+   - 即使模型能勉强放入单个设备的内存，训练或推理所需的计算量也极其庞大，导致耗时过长。分布式可以将计算任务并行化，显著缩短时间。
+3. **数据限制 (Data Limit):**
+   - 训练大模型通常需要海量数据。将数据分布到不同的机器上，可以提高数据加载和处理的效率。
+
+**DP:data parallel数据并行**
+
+**模型并行 (Model Parallelism, MP):**
+
+- **原理:** 将**模型本身**（层、模块或甚至层内的张量）分割到不同的设备上。数据在这些设备之间流动，按顺序通过模型的不同部分。
+- 主要类型:
+  - **张量并行 (Tensor Parallelism, TP):** 将层内的**张量**（如权重矩阵）分割到多个设备上。例如，一个大的权重矩阵可以按列或按行分割，矩阵乘法操作也随之分解并涉及设备间的通信。这解决了单个层计算或存储需求过大的问题。
+  - **流水线并行 (Pipeline Parallelism, PP):** 将模型的**不同层或连续的几层**分配到不同的设备上，形成一个处理数据的流水线。数据批次被进一步分成更小的“微批次”（micro-batches）。当第一个微批次完成第一阶段的计算并传递给第二阶段时，第一阶段就可以开始处理第二个微批次，从而重叠计算和通信。
+- 工作流程 (以 PP 为例):
+  1. 将模型层分组，分配到不同的设备（阶段）。
+  2. 将一个 mini-batch 数据分成多个 micro-batches。
+  3. micro-batches 依次进入流水线的第一个阶段设备，计算完成后传递给下一个阶段设备。
+  4. 不同阶段的设备可以同时处理不同的 micro-batch，形成流水线效应。
+  5. 反向传播也沿着流水线反向进行。
+- **优点:** 可以训练模型本身大于单个设备内存的模型。
+- 缺点:
+  - **实现复杂:** 需要仔细切分模型和管理数据流。
+  - **流水线气泡 (Pipeline Bubble):** 在流水线启动和关闭时，部分设备可能会空闲，效率不高。
+  - **计算/通信平衡:** 需要平衡各阶段的计算负载和设备间的通信开销。
+
+**专家并行 (Expert Parallelism, EP):**
+
+- **原理:** 主要用于 Mixture-of-Experts (MoE) 模型。MoE 模型包含多个独立的“专家”网络。不同的数据输入会通过一个“门控网络”（gating network）被路由到一个或多个特定的专家进行处理。专家并行是将这些不同的专家分散到不同的设备上。
+- **优点:** 可以显著增加模型的总参数量，但每个数据点只激活其中一部分专家，计算效率相对较高。
+- **缺点:** 实现复杂，负载均衡是挑战（确保专家被均匀访问）
+
+### DP:data parallel数据并行
+
+```
+原理：
+将相同完整的模型副本复制到不同的设备上。
+通过一个cpu进程将batch数据分割成多个mini-batch
+每个设备接收不同批次的数据mini-batch进行前向传播和反向传播，计算出各自的梯度。
+然后，通过通信操作将所有设备的梯度进行平均或求和，再用这个平均梯度更新所有设备上的模型参数，保持模型副本的一致性。
+（具体操作是所有梯度集中到gpu0上操作，操作完后将更新的梯度广播给其他的gpu）
+
+使用All-Reduce等通信操作，同步所有设备的梯度（例如，求和或平均）。
+
+不足：
+通信量大
+每个gpu需要保存完整的模型副本
+单进程，多线程，只能利用一个cpu（适用于一机cpu多卡gpu）
 GPU0通信量大
+```
 
 ![image-20250319220151303](../my_minimind/images/image-20250319220151303.png)
 
-### DDP:distributed data parallel
+### DDP:distributed data parallel 分布式数据并行
 
-ring_allreduce: scatter-reduce（有一个数据满了就结束这一阶段）  +  allgather
+#### 集群通信方式ring_allreduce
+
+```
+ring_allreduce第一阶段: scatter-reduce（有一个数据如a,b,c满了就结束这一阶段） 
+```
 
 ![image-20250319221019146](../my_minimind/images/image-20250319221019146.png)
 
+
+
+```
+ring_allreduce第二阶段: allgather（将满的数据发送给下一个gpu，直至所有gpu的梯度全部处理）
+```
+
 ![image-20250319221051513](../my_minimind/images/image-20250319221051513.png)
 
+#### 过程
 
+```
+ddp多进程
+
+原理：
+将相同完整的模型副本复制到不同的设备上。
+通过一个cpu进程将batch数据分割成多个mini-batch
+每个设备接收不同批次的数据mini-batch进行前向传播和反向传播，计算出各自的梯度。
+然后，通过通信操作ring-reduce同步各个gpu的梯度，使得梯度保持一致，保持模型副本的一致性。
+（具体操作是所有梯度集中到gpu0上操作，操作完后将更新的梯度广播给其他的gpu）
+
+使用All-Reduce等通信操作，同步所有设备的梯度（例如，求和或平均）。
+
+不足:
+每个gpu需要存储完整的优化器，显存可能不足。deepspeed可以解决
+```
 
 ![image-20250319220654786](../my_minimind/images/image-20250319220654786.png)
 
+```
+具体细节：
+各个gpu的梯度用桶反向保存，因为输出层的梯度最先计算，这样就能边传输边计算。
+每满一个桶就进行ring allreduce
+```
+
+![image-20250424101943190](pic/image-20250424101943190.png)
+
 ![image-20250319221259577](../my_minimind/images/image-20250319221259577.png)
+
+#### 代码
+
+```python
+import os
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data import Dataset, DataLoader
+from torch.utils.data.distributed import DistributedSampler
+
+# 1. 定义一个简单的模型
+class SimpleModel(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super(SimpleModel, self).__init__()
+        self.fc = nn.Linear(input_dim, output_dim)
+
+    def forward(self, x):
+        return self.fc(x)
+
+# 2. 定义一个简单的模拟数据集
+class DummyDataset(Dataset):
+    def __init__(self, num_samples, input_dim, output_dim):
+        self.num_samples = num_samples
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        # 生成随机数据和标签
+        self.inputs = torch.randn(num_samples, input_dim)
+        self.labels = torch.randn(num_samples, output_dim)
+
+    def __len__(self):
+        return self.num_samples
+
+    def __getitem__(self, idx):
+        return self.inputs[idx], self.labels[idx]
+
+# 3. 分布式训练函数
+def train(rank, world_size, model, train_loader, optimizer, criterion, epoch):
+    # 设置当前进程使用的GPU
+    torch.cuda.set_device(rank)
+    model.cuda(rank)
+
+    # 使用 DDP 包装模型
+    # find_unused_parameters=True might be needed if not all parameters receive gradients
+    # (e.g., when using gradient checkpointing or freezing layers)
+    model = DDP(model, device_ids=[rank], find_unused_parameters=False)
+
+    # 设置 epoch 采样器，确保每个 epoch 的数据顺序不同
+    train_loader.sampler.set_epoch(epoch)
+
+    model.train()
+    running_loss = 0.0
+    for i, data in enumerate(train_loader):
+        inputs, labels = data
+        inputs, labels = inputs.cuda(rank), labels.cuda(rank)
+
+        optimizer.zero_grad()
+
+        outputs = model(inputs)
+        loss = criterion(outputs, labels)
+
+        loss.backward()
+        optimizer.step()
+
+        running_loss += loss.item()
+
+        # 每隔一段时间打印损失
+        if i % 10 == 9 and rank == 0: # 只在主进程打印
+            print(f"Epoch {epoch+1}, Rank {rank}, Step {i+1}, Loss: {running_loss / 10:.4f}")
+            running_loss = 0.0
+
+# 4. 主函数，负责分布式环境初始化和启动训练
+def main():
+    # 获取当前进程的全局 rank (进程编号) 和总进程数
+    rank = int(os.environ["RANK"])
+    world_size = int(os.environ["WORLD_SIZE"])
+
+    print(f"Rank {rank}/{world_size} is initializing...")
+
+    # 初始化分布式环境
+    # backend: 使用的通信后端 (nccl for GPUs, gloo for CPUs)
+    # init_method: 初始化方式 (env:// 表示从环境变量获取 master_addr 和 master_port)
+    dist.init_process_group(backend="nccl", init_method="env://", rank=rank, world_size=world_size)
+
+    print(f"Rank {rank}/{world_size} initialization done.")
+
+    # 设置参数
+    input_dim = 10
+    output_dim = 2
+    num_samples_per_rank = 100 # 每个进程处理的数据量
+    total_samples = num_samples_per_rank * world_size
+    batch_size = 16
+    epochs = 5
+    learning_rate = 0.01
+
+    # 创建数据集和数据加载器
+    # 注意：DistributedSampler 会确保每个进程只加载总数据的一部分
+    dataset = DummyDataset(total_samples, input_dim, output_dim)
+    sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank)
+    train_loader = DataLoader(dataset, batch_size=batch_size, sampler=sampler, num_workers=2) # num_workers 可以根据需要设置
+
+    # 创建模型、损失函数和优化器
+    model = SimpleModel(input_dim, output_dim)
+    criterion = nn.MSELoss()
+    optimizer = optim.SGD(model.parameters(), lr=learning_rate)
+
+    # 开始训练
+    print(f"Rank {rank}/{world_size} starting training...")
+    for epoch in range(epochs):
+        train(rank, world_size, model, train_loader, optimizer, criterion, epoch)
+
+    print(f"Rank {rank}/{world_size} training finished.")
+
+    # 清理分布式环境
+    dist.destroy_process_group()
+    print(f"Rank {rank}/{world_size} destroyed process group.")
+
+if __name__ == "__main__":
+    # 如何运行这个脚本:
+    # 假设你想在两块 GPU 上运行 (world_size=2)
+    # 使用 torchrun 命令 (推荐，PyTorch 1.9+):
+    # torchrun --nproc_per_node=2 your_script_name.py
+    # 或者使用旧的 torch.distributed.launch:
+    # python -m torch.distributed.launch --nproc_per_node=2 your_script_name.py
+
+    # 注意: 这个脚本需要在支持分布式训练的环境中运行 (多块GPU或多台机器)
+    # 如果在单 GPU 环境运行 torchrun --nproc_per_node=1 your_script_name.py 也可以工作
+    # 但要运行在多 GPU 环境，确保你的机器有多块 GPU 并且正确配置了驱动。
+    # 实际运行时，torchrun 会设置 RANK, WORLD_SIZE, MASTER_ADDR, MASTER_PORT 等环境变量
+    # 这些环境变量会被 dist.init_process_group 读取。
+    main()
+```
+
+
 
 ### DeepSpeed ZeRO-1 (zero redundancy optimizer 零冗余优化器)
 
@@ -885,30 +1634,26 @@ ring_allreduce: scatter-reduce（有一个数据满了就结束这一阶段）  
 
 梯度收集：1
 
-
-
 **广播梯度-->更新参数**
 
 大大减少了显存：仅发送给单一GPU
 
-每个GPU保存对应一层的优化器Adam（FP32数据）；每一GPU得到自己层的参数后广播至其他GPU
-
-**为什么需要保存FP16和FP32梯度？？？**
-
 ```
-在混合精度训练中，保存FP16梯度和优化器中维护FP32梯度主要是由于以下原因：
+网络参数和梯度 FP16
+优化器梯度，一阶，二阶，参数（main weight） FP32
 
-1. 反向传播的依赖性与全局梯度处理
-链式法则的连续性：虽然每一层的梯度计算在理论上可以独立完成，但实际中梯度可能需要进行全局操作（如梯度裁剪、归一化）。例如，梯度裁剪需要计算所有参数的梯度范数，才能确定缩放比例。这要求所有梯度必须保留至反向传播完成，无法逐层释放。
-分布式训练中的梯度聚合：在数据并行中，梯度需要跨设备或批次进行累积和同步。梯度必须保留至聚合完成，才能更新权重。
-2. 优化器状态更新的需求
-优化器内部状态依赖完整梯度：如Adam优化器需要维护动量和方差等状态，这些状态的计算需要基于完整的梯度信息。若逐层更新，可能导致状态计算错误（例如动量的指数滑动平均需要所有梯度同时参与）。
-FP32精度的重要性：优化器使用FP32存储梯度以确保数值稳定性。例如，学习率较小时，FP16可能无法表示梯度更新量（如 lr * grad 可能下溢为0），而FP32可避免这一问题。
-3. 框架实现的机制
-计算图与梯度保留策略：主流框架（如PyTorch）的动态计算图默认保留梯度直至反向传播结束。手动释放需要复杂的内存管理（如detach()或retain_graph），但可能破坏计算图的完整性。
-梯度累积的常见实践：在显存不足时，用户可能通过多批次累积梯度再更新。此时梯度需跨批次保留，无法立即释放。
-4. 混合精度中的梯度转换
-梯度缩放（Gradient Scaling）：为防止FP16梯度下溢，混合精度训练通常对梯度进行放大（Scale），再将缩放的FP16梯度转换为FP32用于更新。此过程需要在全局范围内统一处理，无法逐层操作。
+由于占用最大的是优化器，因此每个GPU保存对应网络层的优化器Adam（FP32数据）
+
+过程：
+前向传播
+后向传播：
+首先每个gpu计算所有的梯度fp16，将梯度fp16集中发给对应处理这层的gpu更新梯度；
+这样每个gpu就有自己负责的网络层最新的梯度fp16，也有自己负责的网络层的优化器
+将梯度fp16缩放至fp32，得到一阶二阶动量，更新优化器得到最新的fp32参数
+更新各自优化器对应的网络参数fp16，广播给其他gpu
+
+
+大大减少了显存占用量，但是没有减少通讯量
 ```
 
 ![image-20250319222321451](../my_minimind/images/image-20250319222321451.png)
@@ -921,13 +1666,244 @@ FP32精度的重要性：优化器使用FP32存储梯度以确保数值稳定性
 
 梯度收集：1
 
+```
+每个gpu负责更新各自的网络层的参数，因此只需要保存各自网络层的梯度
+
+过程：
+前向传播
+后向传播：
+首先每个gpu计算所有的梯度fp16，将梯度fp16集中发给对应处理这层的gpu更新梯度；
+不处理这层的gpu发送完梯度fp16后立即释放（不占用显存）
+这样每个gpu就有自己负责的网络层最新的梯度fp16，也有自己负责的网络层的优化器
+将梯度fp16缩放至fp32，得到一阶二阶动量，更新优化器得到最新的fp32参数
+更新各自优化器对应的网络参数fp16，广播给其他gpu
+
+
+大大减少了显存占用量，但是没有减少通讯量
+```
+
 ![image-20250319224601012](../my_minimind/images/image-20250319224601012.png)
+
+#### 代码
+
+**步骤：**
+
+1. **创建 DeepSpeed 配置 JSON 文件**
+2. **创建 Python 训练脚本**
+3. **使用 DeepSpeed 命令运行脚本**
+
+```python
+import os
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import deepspeed
+from torch.utils.data import Dataset, DataLoader
+from torch.utils.data.distributed import DistributedSampler # DeepSpeed handles sampler for you
+
+# 1. 定义一个简单的模拟模型 (可以换成你的大模型)
+class SimpleModel(nn.Module):
+    def __init__(self, input_dim, hidden_dim, output_dim):
+        super(SimpleModel, self).__init__()
+        self.layer1 = nn.Linear(input_dim, hidden_dim)
+        self.relu = nn.ReLU()
+        self.layer2 = nn.Linear(hidden_dim, output_dim)
+
+    def forward(self, x):
+        x = self.layer1(x)
+        x = self.relu(x)
+        x = self.layer2(x)
+        return x
+
+# 2. 定义一个简单的模拟数据集
+class DummyDataset(Dataset):
+    def __init__(self, num_samples, input_dim, output_dim):
+        self.num_samples = num_samples
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        # 生成随机数据和标签
+        self.inputs = torch.randn(num_samples, input_dim)
+        self.labels = torch.randn(num_samples, output_dim)
+
+    def __len__(self):
+        return self.num_samples
+
+    def __getitem__(self, idx):
+        return self.inputs[idx], self.labels[idx]
+
+# 3. 主训练函数
+def main():
+    # 初始化 DeepSpeed 环境
+    # 注意: DeepSpeed 会自动处理 PyTorch 分布式环境的初始化
+    # 命令行参数 --local_rank 会由 deepspeed 启动命令传入
+    deepspeed.init_distributed()
+
+    # 获取当前的 rank (进程编号) 和 world_size (总进程数)
+    rank = torch.distributed.get_rank()
+    world_size = torch.distributed.get_world_size()
+
+    print(f"Rank {rank}/{world_size} is initializing...")
+
+    # 设置参数
+    input_dim = 10
+    hidden_dim = 256 # 可以增大以模拟更大的模型
+    output_dim = 2
+    num_samples_per_rank = 100 # 每个进程处理的数据量
+    total_samples = num_samples_per_rank * world_size
+    # batch_size 和 accumulation_steps 会从 JSON 文件加载或 auto 推断
+    epochs = 5
+    learning_rate = 0.001 # 注意: 实际学习率可能会因为优化器配置和 global_batch_size 变化
+
+    # 创建模型
+    model = SimpleModel(input_dim, hidden_dim, output_dim)
+
+    # 创建数据集和数据加载器
+    # DeepSpeed 的 initialize 函数会返回包装好的 dataloader，
+    # 它内部会使用 DistributedSampler
+    dataset = DummyDataset(total_samples, input_dim, output_dim)
+
+    # 损失函数
+    criterion = nn.MSELoss()
+
+    # === DeepSpeed 初始化 ===
+    # 传入模型、优化器、数据加载器、损失函数以及配置文件路径
+    # deepspeed.initialize 会返回 engine, optimizer, data_loader, lr_scheduler
+    # DeepSpeed 会根据 JSON 配置自动包装模型、优化器和数据加载器
+    # 这里我们先创建标准的 optimizer，DeepSpeed 内部会用它的 fused 优化器代替
+    optimizer = optim.AdamW(model.parameters(), lr=learning_rate)
+
+    # model: PyTorch 模型
+    # optimizer: 标准 PyTorch 优化器 (DeepSpeed 会包装它)
+    # args: 可以通过命令行或字典传入的额外参数，这里用 config= 传入 JSON 路径
+    # lr_scheduler: (可选) 标准 PyTorch 学习率调度器
+    # dist_init_required: DeepSpeed >= 0.4.0 默认是 True，会自动初始化分布式环境
+    engine, optimizer, train_loader, lr_scheduler = deepspeed.initialize(
+        model=model,
+        optimizer=optimizer,
+        args=None, # 可以通过 args 传入命令行参数，这里用 config= 指定 JSON
+        config="ds_config.json",
+        training_data=dataset, # DeepSpeed 可以直接从 dataset 创建 dataloader
+        # training_dataloader=train_loader, # 也可以传入已有的 dataloader
+        lr_scheduler=None,
+        dist_init_required=True # DeepSpeed >= 0.4.0 默认 True
+    )
+
+    print(f"Rank {rank}/{world_size} DeepSpeed engine initialized.")
+
+    # === 训练循环 ===
+    print(f"Rank {rank}/{world_size} starting training...")
+    for epoch in range(epochs):
+        # DeepSpeed 的 train_loader 内部使用了 DistributedSampler，
+        # 所以需要像 PyTorch DDP 一样设置 epoch
+        if hasattr(train_loader.sampler, 'set_epoch'):
+             train_loader.sampler.set_epoch(epoch)
+
+        engine.train() # DeepSpeed engine 设置模型为训练模式
+
+        total_loss = 0.0
+        step_count = 0
+
+        for i, data in enumerate(train_loader):
+            inputs, labels = data
+            # 数据会自动移动到对应的 GPU 上
+            inputs, labels = inputs.to(engine.device), labels.to(engine.device)
+
+            # 前向传播
+            outputs = engine(inputs)
+
+            # 计算损失
+            loss = criterion(outputs, labels)
+
+            # 反向传播 (使用 engine.backward)
+            # DeepSpeed 会根据 ZeRO 配置处理梯度计算和同步
+            engine.backward(loss)
+
+            # 优化器步进 (使用 engine.step)
+            # DeepSpeed 会根据 ZeRO 配置处理参数更新和分片
+            engine.step()
+
+            total_loss += loss.item() * inputs.size(0) # 累加样本损失
+            step_count += inputs.size(0) # 累加样本数
+
+            # 每隔一段时间打印损失 (只在主进程打印)
+            if (i + 1) % 10 == 0 and rank == 0:
+                 print(f"Epoch {epoch+1}, Rank {rank}, Step {i+1}, Loss: {total_loss / step_count:.4f}")
+                 total_loss = 0.0
+                 step_count = 0
+
+
+    print(f"Rank {rank}/{world_size} training finished.")
+
+    # === 保存和加载检查点 (可选) ===
+    # DeepSpeed 的检查点会保存模型、优化器、学习率调度器和 ZeRO 状态
+    checkpoint_dir = "./deepspeed_checkpoint"
+    # 只在主进程保存
+    if rank == 0:
+        print(f"Saving checkpoint to {checkpoint_dir}")
+        engine.save_checkpoint(checkpoint_dir)
+
+    # 在所有进程同步，确保保存完成后再继续 (可选，但推荐)
+    torch.distributed.barrier()
+
+    # 加载检查点 (在所有进程上进行)
+    # print(f"Loading checkpoint from {checkpoint_dir}")
+    # # tag 是检查点的名称，默认为 global step
+    # # load_module_strict=False 如果模型结构有微小变化，可以设置为 False
+    # engine.load_checkpoint(checkpoint_dir, load_module_strict=True)
+    # print(f"Rank {rank}/{world_size} checkpoint loaded.")
+
+
+if __name__ == "__main__":
+    main()
+```
+
+**Step 3: 使用 DeepSpeed 命令运行脚本**
+
+在终端中，使用 `deepspeed` 命令来启动训练。假设你的脚本名为 `train_ds.py`，配置文件名为 `ds_config.json`。
+
+例如，如果你想在两块 GPU 上运行：
+
+Bash
+
+```
+deepspeed --num_gpus=2 train_ds.py --deepspeed_config ds_config.json
+```
+
+**命令解释:**
+
+- `deepspeed`: DeepSpeed 提供的启动命令。
+- `--num_gpus=2`: 指定使用两块 GPU。DeepSpeed 会启动两个进程，每个进程绑定一个 GPU。你可以根据你的机器拥有的 GPU 数量修改这个参数。
+- `train_ds.py`: 你要运行的 Python 训练脚本。
+- `--deepspeed_config ds_config.json`: 指定 DeepSpeed 配置文件的路径。
+
+如果你想在多台机器上运行，启动命令会更复杂，通常涉及 `--num_nodes`、`--node_rank`、`--master_addr` 和 `--master_port` 参数，并且需要在所有机器上执行相应的命令。
 
 ### DeepSpeed ZeRO-3
 
 由于每个GPU独占一层parameter，因此前向传播和反向传播时需要对应GPU广播对应参数：2次
 
 梯度收集：1
+
+```
+每个gpu负责更新各自的网络层的参数，因此只需要保存各自网络层的梯度；同时只保存各自网络层的参数
+
+过程：
+
+前向传播：
+由于gpu只保存一部分网络参数，需要广播；其他gpu收到参数并计算后立即释放网络参数（不占用显存）
+后向传播：
+同样需要网络参数广播；其他gpu收到参数并计算后立即释放网络参数（不占用显存）
+每个gpu计算所有的梯度fp16，将梯度fp16集中发给对应处理这层的gpu更新梯度；
+不处理这层的gpu发送完梯度fp16后立即释放（不占用显存）
+这样每个gpu就有自己负责的网络层最新的梯度fp16，也有自己负责的网络层的优化器
+将梯度fp16缩放至fp32，得到一阶二阶动量，更新优化器得到最新的fp32参数
+更新各自优化器对应的网络参数fp16，广播给其他gpu
+
+
+大大减少了显存占用量，但是通讯量变成1.5倍
+```
+
+![image-20250424105044052](pic/image-20250424105044052.png)
 
 ![image-20250319224314692](../my_minimind/images/image-20250319224314692.png)
 
@@ -940,6 +1916,10 @@ os+g：zero2   共享gradient
 os+g+p：zero3   共享gradient，parameter
 
 ![image-20250319224347437](../my_minimind/images/image-20250319224347437.png)
+
+
+
+
 
 ## 梯度检查点gradient checkpoint/激活值检查点activation checkpoint  
 
@@ -2045,4 +3025,24 @@ def askllm(content):
     response=requests.post(url,headers=headers,json=data)
     return response.json()
 ```
+
+
+
+
+
+# LLM学习路径
+
+## 编程基础
+
+### web框架
+
+Gradio和Streamlit，快速构建前端页面
+
+### 数据分析和可视化
+
+pandas，matplotlib,seaborn
+
+### 数据库
+
+mysql，redis
 
