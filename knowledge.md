@@ -1917,7 +1917,27 @@ os+g+p：zero3   共享gradient，parameter
 
 ![image-20250319224347437](../my_minimind/images/image-20250319224347437.png)
 
+### Accelerate使用
 
+使用Accelerate集成deepspeed，采用单机多卡的形式进行分布式训练
+
+```
+Accelerate使用步骤
+初始化accelerate对象accelerator = Accelerator()
+调用prepare方法对model、dataloader、optimizer、lr_schedluer进行预处理
+删除掉代码中关于gpu的操作，比如.cuda()、.to(device)等，让accelerate自行判断硬件设备的分配
+将loss.backbard()替换为accelerate.backward(loss)
+当使用超过1片GPU进行分布式训练时，在主进程中使用gather方法收集其他几个进程的数据，然后在计算准确率等指标
+
+之后，只需要配置下accelerate的config文件，使用accelerate launch --config_file default_config.yaml train.py启动脚本开始训练啦！
+
+
+Accelerate：在无需大幅修改代码的情况下完成并行化。同时还支持DeepSpeed的多种ZeRO策略，简直不要太爽。
+
+代码效率高，支持无论是单机单卡还是多机多卡适配同一套代码。
+允许在单个实例上训练更大的数据集：Accelerate 还可以使 DataLoaders 更高效。这是通过自定义采样器实现的，它可以在训练期间自动将部分批次发送到不同的设备，从而允许每个设备只需要储存数据的一部分，而不是一次将数据复制四份存入内存。
+支持DeepSpeed：无需更改代码，只用配置文件即可对DeepSpeed开箱即用
+```
 
 
 
